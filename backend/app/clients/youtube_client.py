@@ -1,19 +1,7 @@
+import sys
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-import sys
-import os
-
-# config.py를 찾기 위한 경로 설정
-current_dir = os.path.dirname(__file__)
-backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-sys.path.append(backend_dir)
-
-try:
-    from config import config
-except ImportError:
-    print("Error: config.py를 찾을 수 없습니다.", file=sys.stderr)
-    print(f"Current Path: {sys.path}", file=sys.stderr)
-    sys.exit(1)
+from app.core.config import config
     
 class YouTubeClient:
     def __init__(self):

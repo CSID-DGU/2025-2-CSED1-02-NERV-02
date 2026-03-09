@@ -1,8 +1,7 @@
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from schemas import *
-from routers import system, modules, workflow
+from app.api.v1.api import api_router
 
 app = FastAPI(
     title="YouTube Comment Filtering System API",
@@ -19,9 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(system.router)
-app.include_router(modules.router)
-app.include_router(workflow.router)
+app.include_router(api_router, prefix="/api")
 
 @app.get("/")
 async def root():

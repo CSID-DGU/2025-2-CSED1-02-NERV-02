@@ -10,3 +10,4 @@ JPype1==1.5.2
 konlpy
 torch
 transformers
+pyahocorasick

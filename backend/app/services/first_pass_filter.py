@@ -11,8 +11,9 @@ class FirstPassFilter:
         self.okt = Okt()
         
         # 2. 경로 설정
-        self.base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        self.dict_dir = os.path.join(self.base_dir, 'resources', 'dictionaries')
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        app_dir = os.path.dirname(current_dir)
+        self.dict_dir = os.path.join(app_dir, 'resources', 'dictionaries')
         
         self.user_dict_path = os.path.join(self.dict_dir, 'user_dictionary.json')
         self.system_dict_path = os.path.join(self.dict_dir, 'word_dictionary.json')
@@ -177,7 +178,10 @@ if __name__ == "__main__":
     filter_instance = FirstPassFilter()
     
     # 2. 테스트 케이스
-    test_file_path = os.path.join(filter_instance.base_dir, 'resources', 'test_data', 'test_comments.txt')
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    app_dir = os.path.dirname(current_dir)
+    test_file_path = os.path.join(app_dir, 'resources', 'test_data', 'test_comments.txt')
+    
     with open(test_file_path, "r", encoding="utf-8") as f:
         test_comments = [line.strip() for line in f if line.strip()]
     

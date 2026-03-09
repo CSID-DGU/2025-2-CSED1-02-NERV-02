@@ -1,23 +1,10 @@
 import json
 import openai
-import sys
 import os
 import torch
 import re
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-
-# config.py를 찾기 위한 경로 설정
-current_dir = os.path.dirname(__file__)
-project_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-backend_dir = os.path.join(project_dir, "backend")
-sys.path.append(backend_dir)
-
-try:
-    from config import config
-except ImportError:
-    print("Error: config.py를 찾을 수 없습니다.", file=sys.stderr)
-    print(f"Current Path: {sys.path}", file=sys.stderr)
-    sys.exit(1)
+from app.core.config import config
 
 class SecondPassFilter:
     def __init__(self, api_key=None):
@@ -25,8 +12,10 @@ class SecondPassFilter:
         self.basic_ai_module = config.BASIC_AI_MODULE
         self.special_ai_modules = config.SPECIAL_AI_MODULES
         
-        # AI 모듈 초기화
-        self.basic_module_dir = os.path.join(backend_dir, "resources\\modules\\basic_ai_module")
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        app_dir = os.path.dirname(current_dir)
+        self.basic_module_dir = os.path.join(app_dir, "resources", "modules", "basic_ai_module")
+        
         self.basic_threshold = config.BASIC_THRESHOLD
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 

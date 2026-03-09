@@ -1,24 +1,19 @@
 from fastapi import APIRouter, HTTPException, Body, Depends
-from schemas import TextInput, AnalysisResult, YoutubeAnalysisResponse
 
-from dependencies import (
-    get_first_pass_filter,
-    get_second_pass_filter,
-    get_risk_scorer,
-    get_policy_manager,
-    get_youtube_client
+from app.schemas.schemas import TextInput, AnalysisResult, YoutubeAnalysisResponse
+
+from app.api.deps import (
+    get_first_pass_filter, get_second_pass_filter,
+    get_risk_scorer, get_policy_manager, get_youtube_client
 )
 
-from filter_api.core.first_pass_filter import FirstPassFilter
-from filter_api.core.second_pass_filter import SecondPassFilter
-from filter_api.core.risk_scorer import RiskScorer
-from filter_api.core.policy_manager import PolicyManager
-from filter_api.clients.youtube_client import YouTubeClient
+from app.services.first_pass_filter import FirstPassFilter
+from app.services.second_pass_filter import SecondPassFilter
+from app.services.risk_scorer import RiskScorer
+from app.services.policy_manager import PolicyManager
+from app.clients.youtube_client import YouTubeClient
 
-router = APIRouter(
-    prefix="/api/workflow",
-    tags=["Integrative Workflow (Full Process)"],
-)
+router = APIRouter()
 
 # =========================================================
 # 내부 헬퍼 함수 (파이프라인 실행)

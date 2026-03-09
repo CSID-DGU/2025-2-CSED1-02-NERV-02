@@ -1,1 +1,1 @@
-backend/resources/modules/basic_ai_module/model.safetensors filter=lfs diff=lfs merge=lfs -text
+backend/app/resources/modules/basic_ai_module/model.safetensors filter=lfs diff=lfs merge=lfs -text

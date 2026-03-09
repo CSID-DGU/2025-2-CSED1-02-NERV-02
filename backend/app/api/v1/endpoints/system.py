@@ -1,22 +1,18 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from dotenv import set_key, find_dotenv
 
-from config import config
-from schemas import(
-    DictionaryRequest,
-    DictionaryResponse,
-    DictionaryUpdateResponse,
-    SystemConfigResponse,
-    SystemConfigUpdate
+from app.core.config import config
+
+from app.schemas.schemas import (
+    DictionaryRequest, DictionaryResponse, DictionaryUpdateResponse,
+    SystemConfigResponse, SystemConfigUpdate
 )
 
-from dependencies import get_first_pass_filter
+from app.api.deps import get_first_pass_filter
 
-from filter_api.core.first_pass_filter import FirstPassFilter
+from app.services.first_pass_filter import FirstPassFilter
 
 router = APIRouter(
-    prefix="/api/system",
-    tags=["System & Config"],
     responses={404: {"description": "Not found"}},
 )
 
