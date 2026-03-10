@@ -8,9 +8,9 @@ from app.schemas.schemas import (
     SystemConfigResponse, SystemConfigUpdate
 )
 
-from app.api.deps import get_first_pass_filter
-
+from app.api.deps import get_first_pass_filter, get_dictionary_service
 from app.services.first_pass_filter import FirstPassFilter
+from app.services.dictionary_service import DictionaryService
 
 router = APIRouter(
     responses={404: {"description": "Not found"}},
@@ -23,7 +23,7 @@ router = APIRouter(
 @router.get("/dictionary", response_model=DictionaryResponse, summary="사용자 사전 목록 조회")
 async def get_dictionary_list(
     list_type: str = Query(..., description="조회할 타입 ('whitelist' 또는 'blacklist')"),
-    first_filter: FirstPassFilter = Depends(get_first_pass_filter)
+    dict_service: DictionaryService = Depends(get_dictionary_service)
 ):
     """
     사용자 사전 목록을 조회합니다. list_type('whitelist', 'blacklist')을 지정해야 합니다.
@@ -31,7 +31,7 @@ async def get_dictionary_list(
     if list_type not in ['whitelist', 'blacklist']:
         raise HTTPException(status_code=400, detail="list_type은 'whitelist' 또는 'blacklist'여야 합니다.")
 
-    data = first_filter.get_user_dictionary(list_type)
+    data = dict_service.get_user_dictionary(list_type)
     
     whitelist = data.get('whitelist', []) if data else []
     blacklist = data.get('blacklist', []) if data else []
@@ -45,6 +45,7 @@ async def get_dictionary_list(
 @router.post("/dictionary", response_model=DictionaryUpdateResponse, summary="단어 일괄 추가")
 async def add_dictionary_words(
     req: DictionaryRequest,
+    dict_service: DictionaryService = Depends(get_dictionary_service),
     first_filter: FirstPassFilter = Depends(get_first_pass_filter)
 ):
     """
@@ -53,21 +54,28 @@ async def add_dictionary_words(
     if req.list_type not in ['whitelist', 'blacklist']:
         raise HTTPException(status_code=400, detail="list_type 오류")
     
-    added_count = first_filter._update_user_dictionary(req.words, req.list_type, action='add')
+    added_count = dict_service.update_user_dictionary(req.words, req.list_type, action='add')
     
+    if added_count > 0:
+        first_filter.reload_engine()
+    
+    w_data = dict_service.get_user_dictionary('whitelist')
+    b_data = dict_service.get_user_dictionary('blacklist')
+
     return {
         "status": "success",
         "message": f"{added_count}개의 단어가 {req.list_type}에 추가되었습니다.",
         "processed_count": added_count,
         "current_total": {
-            "whitelist": len(first_filter.user_whitelist),
-            "blacklist": len(first_filter.user_blacklist)
+            "whitelist": len(w_data.get('whitelist', [])),
+            "blacklist": len(b_data.get('blacklist', []))
         }
     }
 
 @router.delete("/dictionary", response_model=DictionaryUpdateResponse, summary="단어 일괄 삭제")
 async def remove_dictionary_words(
     req: DictionaryRequest,
+    dict_service: DictionaryService = Depends(get_dictionary_service),
     first_filter: FirstPassFilter = Depends(get_first_pass_filter)
 ):
     """
@@ -76,15 +84,21 @@ async def remove_dictionary_words(
     if req.list_type not in ['whitelist', 'blacklist']:
         raise HTTPException(status_code=400, detail="list_type 오류")
     
-    removed_count = first_filter._update_user_dictionary(req.words, req.list_type, action='remove')
+    removed_count = dict_service.update_user_dictionary(req.words, req.list_type, action='remove')
     
+    if removed_count > 0:
+        first_filter.reload_engine()
+
+    w_data = dict_service.get_user_dictionary('whitelist')
+    b_data = dict_service.get_user_dictionary('blacklist')
+
     return {
         "status": "success",
         "message": f"{removed_count}개의 단어가 {req.list_type}에서 삭제되었습니다.",
         "processed_count": removed_count,
         "current_total": {
-            "whitelist": len(first_filter.user_whitelist),
-            "blacklist": len(first_filter.user_blacklist)
+            "whitelist": len(w_data.get('whitelist', [])),
+            "blacklist": len(b_data.get('blacklist', []))
         }
     }
 
