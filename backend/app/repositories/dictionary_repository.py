@@ -1,48 +1,65 @@
-import os
-import json
 import logging
+from sqlalchemy import select, delete
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.db.models import UserDictionary, SystemDictionary
 
 logger = logging.getLogger(__name__)
 
 class DictionaryRepository:
-    def __init__(self, dict_dir: str):
-        self.user_dict_path = os.path.join(dict_dir, 'user_dictionary.json')
-        self.system_dict_path = os.path.join(dict_dir, 'word_dictionary.json')
+    def __init__(self, session: AsyncSession):
+        self.session = session
 
-    def load_user_dict(self) -> tuple[set, set]:
-        whitelist, blacklist = set(), set()
+    async def load_system_dict(self) -> set:
         try:
-            with open(self.user_dict_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            whitelist = set(w.strip().lower() for w in data.get("user_whitelist", []))
-            blacklist = set(w.strip().lower() for w in data.get("user_blacklist", []))
-            logger.info(f"[DictionaryRepository] 사용자 사전 로드 완료: 화이트({len(whitelist)}), 블랙({len(blacklist)})")
-        except Exception as e:
-            logger.error(f"[DictionaryRepository] 사용자 사전 로드 실패: {e}")
-        return whitelist, blacklist
-
-    def load_system_dict(self) -> set:
-        system_dict = set()
-        try:
-            with open(self.system_dict_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                for category, content in data.items():
-                    for word in content.get("words", []):
-                        system_dict.add(word.strip().lower())
+            stmt = select(SystemDictionary.word)
+            result = await self.session.execute(stmt)
+            system_dict = set(result.scalars().all())
             logger.info(f"[DictionaryRepository] 시스템 사전 로드 완료: {len(system_dict)}개 단어")
+            return system_dict
         except Exception as e:
             logger.error(f"[DictionaryRepository] 시스템 사전 로드 실패: {e}")
-        return system_dict
+            return set()
 
-    def save_user_dict(self, whitelist: set, blacklist: set) -> bool:
+    async def load_user_dict(self, user_id: int) -> tuple[set, set]:
         try:
-            data = {
-                "user_whitelist": sorted(list(whitelist)),
-                "user_blacklist": sorted(list(blacklist))
-            }
-            with open(self.user_dict_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+            stmt = select(UserDictionary.word, UserDictionary.list_type).where(UserDictionary.user_id == user_id)
+            result = await self.session.execute(stmt)
+            
+            records = result.all()
+
+            whitelist = {word for word, l_type in records if l_type == 'WHITELIST'}
+            blacklist = {word for word, l_type in records if l_type == 'BLACKLIST'}
+            
+            logger.info(f"[DictionaryRepository] 유저({user_id}) 사전 로드 완료: 화이트({len(whitelist)}), 블랙({len(blacklist)})")
+            return whitelist, blacklist
+            
+        except Exception as e:
+            logger.error(f"[DictionaryRepository] 유저({user_id}) 사전 로드 실패: {e}")
+            return set(), set()
+
+    async def add_user_word(self, user_id: int, word: str, list_type: str) -> bool:
+        try:
+            new_word = UserDictionary(user_id=user_id, word=word, list_type=list_type)
+            self.session.add(new_word)
+            await self.session.commit()
+            logger.info(f"[DictionaryRepository] 유저({user_id}) 사전 단어 추가: {word} ({list_type})")
             return True
         except Exception as e:
-            logger.error(f"[DictionaryRepository] 사용자 사전 저장 실패: {e}")
+            await self.session.rollback()
+            logger.error(f"[DictionaryRepository] 유저({user_id}) 사전 단어 추가 실패: {e}")
+            return False
+
+    async def remove_user_word(self, user_id: int, word: str) -> bool:
+        try:
+            stmt = delete(UserDictionary).where(
+                UserDictionary.user_id == user_id, 
+                UserDictionary.word == word
+            )
+            await self.session.execute(stmt)
+            await self.session.commit()
+            logger.info(f"[DictionaryRepository] 유저({user_id}) 사전 단어 삭제: {word}")
+            return True
+        except Exception as e:
+            await self.session.rollback()
+            logger.error(f"[DictionaryRepository] 유저({user_id}) 사전 단어 삭제 실패: {e}")
             return False

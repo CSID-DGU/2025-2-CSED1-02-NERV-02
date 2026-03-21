@@ -1,30 +1,33 @@
-import sys
+import logging
+from typing import Dict, Any, List, Optional
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from app.core.config import config
-    
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
 class YouTubeClient:
     def __init__(self):
-        print("[System] YouTube Client 초기화 중...")
+        logger.info("[System] YouTube Client 초기화 중...")
         self.youtube = self._build_service()
 
     def _build_service(self):
         """(내부 메서드) YouTube API 서비스 연결"""
-        api_key = config.YOUTUBE_API_KEY
-        
+        api_key = settings.YOUTUBE_API_KEY
+
         if not api_key or api_key == "YOUR_ACTUAL_API_KEY_HERE":
-            print("Error: YouTube API Key가 설정되지 않았습니다.", file=sys.stderr)
-            return None
-        
-        try:
-            service = build('youtube', 'v3', developerKey=api_key)
-            print("[System] YouTube 서비스 연결 성공")
-            return service
-        except Exception as e:
-            print(f"YouTube 서비스 빌드 실패: {e}", file=sys.stderr)
+            logger.error("YouTube API Key가 설정되지 않았습니다.")
             return None
 
-    def get_video_details(self, video_id):
+        try:
+            service = build('youtube', 'v3', developerKey=api_key)
+            logger.info("[System] YouTube 서비스 연결 성공")
+            return service
+        except Exception as e:
+            logger.error(f"YouTube 서비스 빌드 실패: {e}")
+            return None
+
+    def get_video_details(self, video_id: str) -> Optional[Dict[str, Any]]:
         """영상 메타데이터 수집"""
         if not self.youtube:
             return None
@@ -37,7 +40,7 @@ class YouTubeClient:
             response = request.execute()
 
             if not response.get('items'):
-                print(f"Error: 비디오 ID {video_id}를 찾을 수 없습니다.", file=sys.stderr)
+                logger.warning(f"비디오 ID {video_id}를 찾을 수 없습니다.")
                 return None
 
             item = response['items'][0]
@@ -57,13 +60,13 @@ class YouTubeClient:
             }
 
         except HttpError as e:
-            print(f"YouTube API Error: {e}", file=sys.stderr)
+            logger.error(f"YouTube API Error: {e}")
             return None
         except Exception as e:
-            print(f"Unknown Error: {e}", file=sys.stderr)
+            logger.error(f"Unknown Error: {e}")
             return None
 
-    def get_comments(self, video_id, max_pages=1):
+    def get_comments(self, video_id: str, max_pages: int = 1) -> List[Dict[str, Any]]:
         """댓글 데이터 수집"""
         if not self.youtube:
             return []
@@ -102,8 +105,8 @@ class YouTubeClient:
             return comments_list
 
         except HttpError as e:
-            print(f"YouTube API Error: {e}", file=sys.stderr)
+            logger.error(f"YouTube API Error: {e}")
             return []
         except Exception as e:
-            print(f"Unknown Error: {e}", file=sys.stderr)
+            logger.error(f"Unknown Error: {e}")
             return []

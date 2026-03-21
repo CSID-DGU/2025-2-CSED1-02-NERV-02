@@ -1,11 +1,21 @@
 from typing import List, Optional, Dict, Any
+from enum import Enum
 from pydantic import BaseModel, Field
+
+# [Enum 타입]
+
+class ListTypeParam(str, Enum):
+    whitelist = "whitelist"
+    blacklist = "blacklist"
 
 # [사전 관리 모델]
 
-class DictionaryRequest(BaseModel):
-    words: List[str] = Field(..., description="추가/삭제할 단어 리스트", json_schema_extra={"example": ["바보", "멍청이"]})
-    list_type: str = Field(..., description="'whitelist' 또는 'blacklist'", json_schema_extra={"example": "blacklist"})
+class DictionaryWordsRequest(BaseModel):
+    words: List[str] = Field(
+        ..., 
+        description="추가/삭제할 단어 리스트", 
+        json_schema_extra={"example": ["바보", "멍청이"]}
+    )
 
 class DictionaryResponse(BaseModel):
     whitelist: List[str] = Field(default_factory=list, description="허용 단어 목록")
@@ -18,19 +28,22 @@ class DictionaryUpdateResponse(BaseModel):
     processed_count: int
     current_total: Dict[str, int]
 
-# [시스템 설정 모델]
+# [유저 설정 모델]
 
-class SystemConfigUpdate(BaseModel):
-    security_level: Optional[int] = Field(None, description="보안 레벨 (1~5)", ge=1, le=5, json_schema_extra={"example": 4})
-    risk_threshold: Optional[float] = Field(None, description="위험도 임계값 (0.0~1.0)", ge=0.0, le=1.0, json_schema_extra={"example": 0.75})
-    use_detail_ai: Optional[bool] = Field(None, description="2차 정밀 AI 모델 사용 여부", json_schema_extra={"example": True})
-    enabled_modules: Optional[List[str]] = Field(None, description="활성화할 AI 모듈 키 리스트", json_schema_extra={"example": ["SEXUAL", "PRIVACY", "AGGRESSION"]})
+class UserSettingsUpdate(BaseModel):
+    security_level: Optional[int] = Field(None, description="보안 레벨 (1~5)", ge=1, le=5)
+    risk_threshold: Optional[float] = Field(None, description="위험도 임계값 (0.0~1.0)", ge=0.0, le=1.0)
+    use_detail_ai_model: Optional[bool] = Field(None, description="2차 정밀 AI 모델 사용 여부")
+    basic_threshold: Optional[float] = Field(None, description="1차 AI 모듈 임계값", ge=0.0, le=1.0)
+    enabled_modules: Optional[str] = Field(None, description="활성화 모듈 콤마 구분 (예: 'SEXUAL,PRIVACY' 또는 'ALL')")
 
-class SystemConfigResponse(BaseModel):
+class UserSettingsResponse(BaseModel):
+    user_id: int
     security_level: int
     risk_threshold: float
     use_detail_ai_model: bool
-    enabled_modules: List[str]
+    basic_threshold: float
+    enabled_modules: str
 
 # --- [Raw Text] ---
 
@@ -51,7 +64,7 @@ class FirstPassResponse(BaseModel):
     detected_words: List[FirstPassDetectedWord] = Field(..., json_schema_extra={
         "example": [{"word": "개새끼", "type": "SYSTEM_KEYWORD"}]
     })
-    text_for_filtering: str = Field(..., description="1차 마스킹 완료된 텍스트", json_schema_extra={
+    masked_text: str = Field(..., description="1차 마스킹 완료된 텍스트", json_schema_extra={
         "example": "야이 __F__야 ㅋㅋ 니네 집 주소 다 털었다 010-1234-5678 밤길 조심해라"
     })
 
@@ -71,7 +84,7 @@ class SecondPassResponse(BaseModel):
             {"word": "010-1234-5678", "type": "AI_PRIVACY"}
         ]
     })
-    text_for_filtering: str = Field(..., description="2차 마스킹 완료된 텍스트", json_schema_extra={
+    masked_text: str = Field(..., description="2차 마스킹 완료된 텍스트", json_schema_extra={
         "example": "야이 __F__야 ㅋㅋ __S__ __S__ __S__"
     })
 
@@ -82,7 +95,6 @@ class RiskResponse(BaseModel):
 
 class PolicyInput(BaseModel):
     risk_score: float = Field(..., json_schema_extra={"example": 0.98})
-    # 정책 결정에는 최종 결과(2차 결과)가 들어가는 것이 맞음
     filter_result: SecondPassResponse 
 
 class PolicyResponse(BaseModel):
@@ -97,7 +109,7 @@ class AnalysisResult(BaseModel):
     processed_text: str
     action: str
     score: float
-    details: SecondPassResponse # 디테일은 최종 필터링 결과 구조를 따름
+    details: SecondPassResponse
 
 # --- [유튜브 리포트 모델] ---
 
@@ -109,6 +121,10 @@ class YoutubeCommentSummary(BaseModel):
     action: str
     risk_score: float
     violation_tags: List[str]
+
+class YoutubeAnalysisRequest(BaseModel):
+    video_id: str
+    max_pages: int = 1
 
 class YoutubeAnalysisResponse(BaseModel):
     video_info: Dict[str, str]

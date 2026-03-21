@@ -1,40 +1,49 @@
 import logging
+from enum import Enum
 from app.repositories.dictionary_repository import DictionaryRepository
 
 logger = logging.getLogger(__name__)
 
+class ListType(str, Enum):
+    WHITELIST = "whitelist"
+    BLACKLIST = "blacklist"
+
 class DictionaryService:
     def __init__(self, repo: DictionaryRepository):
         self.repo = repo
-
-    def get_user_dictionary(self, list_type: str) -> dict:
-        whitelist, blacklist = self.repo.load_user_dict()
-        if list_type == 'whitelist':
-            return {"whitelist": sorted(list(whitelist))}
-        elif list_type == 'blacklist':
-            return {"blacklist": sorted(list(blacklist))}
-        return {}
-
-    def update_user_dictionary(self, words: list, list_type: str, action: str) -> int:
-        whitelist, blacklist = self.repo.load_user_dict()
-        target_set = whitelist if list_type == 'whitelist' else blacklist if list_type == 'blacklist' else None
+    
+    async def get_user_dictionaries(self, user_id: int) -> dict:
+        whitelist, blacklist = await self.repo.load_user_dict(user_id)
+        return {
+            "whitelist": sorted(list(whitelist)),
+            "blacklist": sorted(list(blacklist))
+        }
+    
+    async def add_user_words(self, user_id: int, words: list[str], list_type: ListType) -> int:
+        db_list_type = list_type.value.upper()
+        added_count = 0
         
-        if target_set is None: return 0
-
-        changed_count = 0
-        for word in words:
-            word = word.strip().lower()
-            if not word: continue
-
-            if action == 'add' and word not in target_set:
-                target_set.add(word)
-                changed_count += 1
-            elif action == 'remove' and word in target_set:
-                target_set.remove(word)
-                changed_count += 1
+        cleaned_words = {word.strip().lower() for word in words if word.strip()}
         
-        if changed_count > 0:
-            self.repo.save_user_dict(whitelist, blacklist)
-            logger.info(f"[DictionaryService] '{list_type}'에 {changed_count}개 단어 {action} 완료.")
-            
-        return changed_count
+        for word in cleaned_words:
+            if await self.repo.add_user_word(user_id, word, db_list_type):
+                added_count += 1
+        
+        if added_count > 0:
+            logger.info(f"[DictionaryService] 유저({user_id})의 '{db_list_type}'에 {added_count}개 단어 추가 완료.")
+        
+        return added_count
+    
+    async def remove_user_words(self, user_id: int, words: list[str]) -> int:
+        removed_count = 0
+        
+        cleaned_words = {word.strip().lower() for word in words if word.strip()}
+        
+        for word in cleaned_words:
+            if await self.repo.remove_user_word(user_id, word):
+                removed_count += 1
+        
+        if removed_count > 0:
+            logger.info(f"[DictionaryService] 유저({user_id})의 사전에서 {removed_count}개 단어 삭제 완료.")
+        
+        return removed_count

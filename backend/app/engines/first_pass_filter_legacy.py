@@ -1,4 +1,3 @@
-# app/services/first_pass_filter.py
 import re
 import logging
 from konlpy.tag import Okt
@@ -6,27 +5,25 @@ from app.repositories.dictionary_repository import DictionaryRepository
 
 logger = logging.getLogger(__name__)
 
-class FirstPassFilter:
+class LegacyFirstPassFilter:
     def __init__(self, repo: DictionaryRepository):
         self.dict_repo = repo
         
-        logger.info("[FirstPassFilter] 형태소 분석기(Okt) 로드 중... (시간이 조금 걸릴 수 있습니다)")
+        logger.info("[LegacyFirstPassFilter] 형태소 분석기(Okt) 로드 중... (시간이 조금 걸릴 수 있습니다)")
         self.okt = Okt()
         
         self.user_whitelist = set()
         self.user_blacklist = set()
         self.system_dictionary = set()
-        
-        self.reload_engine()
 
-    def reload_engine(self):
+    async def reload_engine(self, user_id: int):
         """사전 데이터를 다시 불러와서 최신 상태로 갱신합니다."""
-        logger.info("[FirstPassFilter] 사전 데이터 장전(Reload) 시작...")
+        logger.info(f"[LegacyFirstPassFilter] 유저({user_id}) 사전 데이터 Reload ...")
         
-        self.user_whitelist, self.user_blacklist = self.dict_repo.load_user_dict()
-        self.system_dictionary = self.dict_repo.load_system_dict()
+        self.user_whitelist, self.user_blacklist = await self.dict_repo.load_user_dict(user_id)
+        self.system_dictionary = await self.dict_repo.load_system_dict()
         
-        logger.info(f"[FirstPassFilter] 사전 갱신 완료 (W:{len(self.user_whitelist)}, B:{len(self.user_blacklist)}, S:{len(self.system_dictionary)})")
+        logger.info(f"[LegacyFirstPassFilter] 유저({user_id}) 사전 갱신 완료 (W:{len(self.user_whitelist)}, B:{len(self.user_blacklist)}, S:{len(self.system_dictionary)})")
 
     @staticmethod
     def normalize_text(text: str) -> str:

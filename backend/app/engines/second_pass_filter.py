@@ -4,19 +4,19 @@ import os
 import torch
 import re
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from app.core.config import config
+from app.core.config import settings
 
 class SecondPassFilter:
     def __init__(self, api_key=None):
         # 프롬프트 모듈 설정 로드
-        self.basic_ai_module = config.BASIC_AI_MODULE
-        self.special_ai_modules = config.SPECIAL_AI_MODULES
+        self.basic_ai_module = settings.BASIC_AI_MODULE
+        self.special_ai_modules = settings.SPECIAL_AI_MODULES
         
         current_dir = os.path.dirname(os.path.abspath(__file__))
         app_dir = os.path.dirname(current_dir)
         self.basic_module_dir = os.path.join(app_dir, "resources", "modules", "basic_ai_module")
         
-        self.basic_threshold = config.BASIC_THRESHOLD
+        self.basic_threshold = settings.BASIC_THRESHOLD
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         try:
@@ -30,7 +30,7 @@ class SecondPassFilter:
             self.basic_module_dir = None
 
         # OPEN AI 클라이언트 초기화
-        api_key = config.OPENAI_API_KEY
+        api_key = settings.OPENAI_API_KEY
         
         if api_key:
             # 키가 있으면 정상적으로 클라이언트 생성
