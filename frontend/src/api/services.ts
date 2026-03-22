@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { YoutubeAnalysisResponse, SystemConfigResponse, SystemConfigUpdate, DictionaryRequest, DictionaryResponse, DictionaryUpdateResponse } from './types';
+import type { YoutubeAnalysisResponse, SystemConfigResponse, SystemConfigUpdate, DictionaryResponse, DictionaryUpdateResponse } from './types';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -10,7 +10,8 @@ const client = axios.create({
 
 // --- API FUNCTIONS ---
 
-export const fetchAnalysis = async (videoId: string): Promise<YoutubeAnalysisResponse> => {
+// 1. 유튜브 영상 댓글 분석
+export const fetchAnalysis = async (userId: number, videoId: string, maxPages: number = 1): Promise<YoutubeAnalysisResponse> => {
   // 로컬 개발 환경이거나 videoId가 테스트용이면 Mock 데이터 반환
   // if (!import.meta.env.PROD || videoId === 'test_video_id') {
   //   console.log(`[Mock API] Fetching analysis for ${videoId}`);
@@ -19,42 +20,45 @@ export const fetchAnalysis = async (videoId: string): Promise<YoutubeAnalysisRes
   // }
 
   // 실제 API 호출
-  const response = await client.post(`/api/workflow/analyze-youtube`, null, {
-    params: { video_id: videoId, max_pages: 1 },
+  const response = await client.post(`/api/users/${userId}/youtube-analyses`, {
+    video_id: videoId,
+    max_pages: maxPages
   });
   return response.data;
 };
 
 // 2. 시스템 설정 조회 (GET)
-export const fetchSystemConfig = async (): Promise<SystemConfigResponse> => {
-  const response = await client.get<SystemConfigResponse>('/api/system/config');
+export const fetchSystemConfig = async (userId: number): Promise<SystemConfigResponse> => {
+  const response = await client.get<SystemConfigResponse>(`/api/users/${userId}/settings`);
   return response.data;
 };
 
 // 3. 시스템 설정 업데이트 (PATCH)
-export const updateSystemConfig = async (data: SystemConfigUpdate): Promise<SystemConfigResponse> => {
-  const response = await client.patch<SystemConfigResponse>('/api/system/config', data);
+export const updateSystemConfig = async (userId: number, data: SystemConfigUpdate): Promise<SystemConfigResponse> => {
+  const response = await client.patch<SystemConfigResponse>(`/api/users/${userId}/settings`, data);
   return response.data;
 };
 
-// 1. 단어 목록 조회 (GET)
-export const fetchDictionary = async (listType: 'whitelist' | 'blacklist'): Promise<DictionaryResponse> => {
-  const response = await client.get<DictionaryResponse>('/api/system/dictionary', {
-    params: { list_type: listType }
-  });
+// 4. 사전 전체 조회 (GET) - whitelist + blacklist 동시 조회
+export const fetchDictionary = async (userId: number): Promise<DictionaryResponse> => {
+  const response = await client.get<DictionaryResponse>(`/api/users/${userId}/dictionaries`);
   return response.data;
 };
 
-// 2. 단어 일괄 추가 (POST)
-export const addDictionaryWord = async (req: DictionaryRequest): Promise<DictionaryUpdateResponse> => {
-  const response = await client.post<DictionaryUpdateResponse>('/api/system/dictionary', req);
+// 5. 단어 일괄 추가 (POST)
+export const addDictionaryWord = async (userId: number, listType: 'whitelist' | 'blacklist', words: string[]): Promise<DictionaryUpdateResponse> => {
+  const response = await client.post<DictionaryUpdateResponse>(
+    `/api/users/${userId}/dictionaries/${listType}`,
+    { words }
+  );
   return response.data;
 };
 
-// 3. 단어 목록 일괄 삭제 (DELETE)
-export const deleteDictionaryWord = async (req: DictionaryRequest): Promise<DictionaryUpdateResponse> => {
-  const response = await client.delete<DictionaryUpdateResponse>('/api/system/dictionary', {
-    data: req 
-  });
+// 6. 단어 목록 일괄 삭제 (DELETE)
+export const deleteDictionaryWord = async (userId: number, listType: 'whitelist' | 'blacklist', words: string[]): Promise<DictionaryUpdateResponse> => {
+  const response = await client.delete<DictionaryUpdateResponse>(
+    `/api/users/${userId}/dictionaries/${listType}`,
+    { data: { words } }
+  );
   return response.data;
 };

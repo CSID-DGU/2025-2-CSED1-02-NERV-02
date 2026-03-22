@@ -20,7 +20,7 @@ router = APIRouter()
 # [API] 시스템 설정 관리 API (System Config APIs)
 # =========================================================
 
-@router.get("/users/{user_id}/dictionaries", response_model=DictionaryResponse, summary="사용자 사전 전체 조회")
+@router.get("/{user_id}/dictionaries", response_model=DictionaryResponse, summary="사용자 사전 전체 조회")
 async def get_user_dictionaries(
     user_id: int,
     dict_service: DictionaryService = Depends(get_dictionary_service)
@@ -40,11 +40,11 @@ async def get_user_dictionaries(
         "total_count": len(whitelist) + len(blacklist)
     }
 
-@router.post("/users/{user_id}/dictionaries/{list_type}", response_model=DictionaryUpdateResponse, summary="사전에 단어 추가")
+@router.post("/{user_id}/dictionaries/{list_type}", response_model=DictionaryUpdateResponse, summary="사전에 단어 추가")
 async def add_dictionary_words(
     user_id: int,  
     list_type: ListTypeParam,
-    req: DictionaryWordsRequest,  # ✅ body에는 words만
+    req: DictionaryWordsRequest,
     dict_service: DictionaryService = Depends(get_dictionary_service),
     first_filter: FirstPassFilter = Depends(get_first_pass_filter)
 ):
@@ -73,7 +73,7 @@ async def add_dictionary_words(
         }
     }
 
-@router.delete("/users/{user_id}/dictionaries/{list_type}", response_model=DictionaryUpdateResponse, summary="단어 일괄 삭제")
+@router.delete("/{user_id}/dictionaries/{list_type}", response_model=DictionaryUpdateResponse, summary="단어 일괄 삭제")
 async def remove_dictionary_words(
     user_id: int,
     list_type: ListTypeParam,
@@ -105,7 +105,7 @@ async def remove_dictionary_words(
         }
     }
 
-@router.get("/users/{user_id}/settings", response_model=UserSettingsResponse, summary="유저 개인 설정 조회")
+@router.get("/{user_id}/settings", response_model=UserSettingsResponse, summary="유저 개인 설정 조회")
 async def get_user_settings(
     user_id: int,
     user_repo: UserRepository = Depends(get_user_repository)
@@ -124,7 +124,7 @@ async def get_user_settings(
         "enabled_modules": user.enabled_modules
     }
 
-@router.patch("/users/{user_id}/settings", summary="유저 개인 필터링 설정 변경")
+@router.patch("/{user_id}/settings", summary="유저 개인 필터링 설정 변경")
 async def update_user_settings(
     user_id: int,
     req: UserSettingsUpdate,

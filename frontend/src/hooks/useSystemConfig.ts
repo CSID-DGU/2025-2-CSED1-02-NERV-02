@@ -43,9 +43,12 @@ const transformToAppSettings = (data: SystemConfigResponse): AppSettings => {
     family: false,
   };
 
+  // enabled_modules가 문자열이므로 split으로 배열로 변환
+  const enabledModulesArray = data.enabled_modules ? data.enabled_modules.split(',').map(m => m.trim()) : [];
+
   (Object.keys(MODULE_MAP) as Array<keyof typeof MODULE_MAP>).forEach((uiKey) => {
     const backendKey = MODULE_MAP[uiKey];
-    if (data.enabled_modules.includes(backendKey)) {
+    if (enabledModulesArray.includes(backendKey)) {
       modules[uiKey] = true;
     }
   });
@@ -59,35 +62,36 @@ const transformToAppSettings = (data: SystemConfigResponse): AppSettings => {
 
 // [변환기] 프론트엔드 -> 백엔드
 const transformToBackendUpdate = (settings: AppSettings) => {
-  const enabled_modules: string[] = [];
+  const enabled_modules_array: string[] = [];
 
   (Object.keys(settings.modules) as Array<keyof typeof settings.modules>).forEach((uiKey) => {
     if (settings.modules[uiKey]) {
-      enabled_modules.push(MODULE_MAP[uiKey]);
+      enabled_modules_array.push(MODULE_MAP[uiKey]);
     }
   });
 
   return {
     security_level: settings.intensity,
-    enabled_modules,
+    enabled_modules: enabled_modules_array.join(','), // 배열을 콤마 구분 문자열로 변환
   };
 };
 
 // 1. 설정 조회 Hook (Config API)
 export const useSettings = () => {
+  const userId = 1; // TODO: 나중에 실제 로그인 시스템 연동
+  
   return useQuery({
-    queryKey: ['system-config'],
-    queryFn: fetchSystemConfig,
+    queryKey: ['system-config', userId],
+    queryFn: () => fetchSystemConfig(userId),
     select: transformToAppSettings,
     // 초기값에서 SystemConfigResponse 형태를 맞춰줌
     initialData: { 
+      user_id: 1,  // 추가
       security_level: 3, 
-      enabled_modules: [], 
-      risk_threshold: 0, 
+      enabled_modules: 'ALL',  // 문자열로 변경
+      risk_threshold: 0.65, 
       use_detail_ai_model: false,
-      // 백엔드 응답엔 아직 whitelist 필드가 남아있을 수 있으니 빈 배열로 둠 (타입 맞춤용)
-      whitelist: [], 
-      blacklist: []
+      basic_threshold: 0.9,  // 추가
     } as SystemConfigResponse, 
     staleTime: Infinity,
   });
@@ -96,11 +100,12 @@ export const useSettings = () => {
 // 2. 설정 업데이트 Hook (Config API)
 export const useUpdateSettings = () => {
   const queryClient = useQueryClient();
+  const userId = 1; // TODO: 나중에 실제 로그인 시스템 연동
 
   return useMutation({
     mutationFn: (newSettings: AppSettings) => {
       const payload = transformToBackendUpdate(newSettings);
-      return updateSystemConfig(payload);
+      return updateSystemConfig(userId, payload);
     },
     
     // 낙관적 업데이트
@@ -126,20 +131,18 @@ export const useUpdateSettings = () => {
 
 // 1. 조회 Hook
 export const useDictionary = () => {
+  const userId = 1; // TODO: 나중에 실제 로그인 시스템 연동
+  
   return useQuery({
-    queryKey: ['system-dictionary'],
+    queryKey: ['system-dictionary', userId],
     queryFn: async () => {
       try {
-        // 백엔드 스펙상 따로 조회해야 하므로 Promise.all로 병렬 처리
-        const [whiteRes, blackRes] = await Promise.all([
-          fetchDictionary('whitelist'),
-          fetchDictionary('blacklist')
-        ]);
+        // 백엔드가 이제 whitelist + blacklist를 한 번에 반환
+        const result = await fetchDictionary(userId);
         
-        // 두 결과를 하나의 객체로 병합하여 반환 (UI 편의성)
         return {
-          whitelist: whiteRes.whitelist || [],
-          blacklist: blackRes.blacklist || []
+          whitelist: result.whitelist || [],
+          blacklist: result.blacklist || []
         };
       } catch (error) {
         console.warn("서버 연결 실패, 목 데이터를 반환합니다.");
@@ -154,9 +157,11 @@ export const useDictionary = () => {
 // 2. 추가 Hook (POST) - [서버 죽어도 화면엔 추가됨]
 export const useAddDictionaryWord = () => {
   const queryClient = useQueryClient();
+  const userId = 1; // TODO: 나중에 실제 로그인 시스템 연동
 
   return useMutation({
-    mutationFn: (req: DictionaryRequest) => addDictionaryWord(req),
+    mutationFn: (req: DictionaryRequest) => 
+      addDictionaryWord(userId, req.list_type, req.words),
     
     // 낙관적 업데이트 (추가)
     onMutate: async (newWordReq) => {
@@ -180,9 +185,11 @@ export const useAddDictionaryWord = () => {
 // 3. 삭제 Hook (DELETE) - [서버 죽어도 화면엔 반영됨]
 export const useDeleteDictionaryWord = () => {
   const queryClient = useQueryClient();
+  const userId = 1; // TODO: 나중에 실제 로그인 시스템 연동
 
   return useMutation({
-    mutationFn: (req: DictionaryRequest) => deleteDictionaryWord(req),
+    mutationFn: (req: DictionaryRequest) => 
+      deleteDictionaryWord(userId, req.list_type, req.words),
     
     // 낙관적 업데이트 (삭제)
     onMutate: async (delWordReq) => {

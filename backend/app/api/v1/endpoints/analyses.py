@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # [API] 전체 통합 워크플로우 (Workflow APIs)
 # =========================================================
 
-@router.post("/users/{user_id}/text-analyses", response_model=AnalysisResult, summary="단일 텍스트 전체 분석")
+@router.post("/{user_id}/text-analyses", response_model=AnalysisResult, summary="단일 텍스트 전체 분석")
 async def analyze_single_text(
     user_id: int,
     input_data: TextInput = Body(
@@ -50,7 +50,7 @@ async def analyze_single_text(
         logger.exception(f"텍스트 분석 중 예상치 못한 오류 발생 - 유저({user_id})")
         raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다.")
 
-@router.post("/users/{user_id}/youtube-analyses", response_model=YoutubeAnalysisResponse, summary="유튜브 영상 댓글 분석")
+@router.post("/{user_id}/youtube-analyses", response_model=YoutubeAnalysisResponse, summary="유튜브 영상 댓글 분석")
 async def analyze_youtube_video(
     user_id: int,
     req: YoutubeAnalysisRequest = Body(...),

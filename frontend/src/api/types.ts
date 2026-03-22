@@ -24,17 +24,20 @@ export interface YoutubeAnalysisResponse {
 }
 
 export interface SystemConfigResponse {
+  user_id: number;              // 유저 ID 추가
   security_level: number;       // UI의 intensity (1~5)
   risk_threshold: number;       // 위험도 임계값
   use_detail_ai_model: boolean; // 정밀 AI 사용 여부
-  enabled_modules: string[];    // 활성화된 모듈 키 리스트 (예: ["SEXUAL", "AGGRESSION"])
+  basic_threshold: number;      // 1차 AI 모듈 임계값 추가
+  enabled_modules: string;      // 콤마 구분 문자열 (예: "SEXUAL,AGGRESSION" 또는 "ALL")
 }
 
 export interface SystemConfigUpdate {
   security_level?: number | null;
   risk_threshold?: number | null;
-  use_detail_ai?: boolean | null;
-  enabled_modules?: string[] | null;
+  use_detail_ai_model?: boolean | null;  // use_detail_ai -> use_detail_ai_model
+  basic_threshold?: number | null;        // 추가
+  enabled_modules?: string | null;        // string[] -> string
 }
 
 export interface AppSettings {
