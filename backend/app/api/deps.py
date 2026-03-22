@@ -5,7 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 
 from app.repositories.user_repository import UserRepository
+from app.repositories.comment_analysis_cache_repository import CommentAnalysisCacheRepository
 from app.repositories.dictionary_repository import DictionaryRepository
+from app.repositories.video_analysis_cache_repository import VideoAnalysisCacheRepository
 from app.engines.first_pass_filter import FirstPassFilter
 from app.engines.second_pass_filter import SecondPassFilter
 from app.engines.risk_scorer import RiskScorer
@@ -20,6 +22,16 @@ async def get_user_repository(session: AsyncSession = Depends(get_db)) -> UserRe
 
 async def get_dictionary_repository(session: AsyncSession = Depends(get_db)) -> DictionaryRepository:
     return DictionaryRepository(session)
+
+async def get_video_analysis_cache_repository(
+    session: AsyncSession = Depends(get_db)
+) -> VideoAnalysisCacheRepository:
+    return VideoAnalysisCacheRepository(session)
+
+async def get_comment_analysis_cache_repository(
+    session: AsyncSession = Depends(get_db)
+) -> CommentAnalysisCacheRepository:
+    return CommentAnalysisCacheRepository(session)
 
 # --- [Engines] ---
 async def get_first_pass_filter(repo: DictionaryRepository = Depends(get_dictionary_repository)) -> FirstPassFilter:

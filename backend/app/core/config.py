@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
 
     DEBUG_MODE: bool = False
+    VIDEO_ANALYSIS_CACHE_TTL_SECONDS: int = 3600
 
     BASIC_AI_MODULE: List[str] = [
         '공격적이거나 모욕적인 내용이 포함되어 있는지',
