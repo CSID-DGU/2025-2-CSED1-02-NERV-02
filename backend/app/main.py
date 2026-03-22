@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-
+from app.core.logging import setup_logging
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
@@ -14,6 +14,7 @@ async def lifespan(_: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     yield
 
+setup_logging()
 
 app = FastAPI(
     title="YouTube Comment Filtering System API",
