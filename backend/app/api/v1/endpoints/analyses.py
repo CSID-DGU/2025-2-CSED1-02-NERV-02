@@ -9,23 +9,24 @@ from app.api.deps import (
     get_user_repository,
     get_video_analysis_cache_repository,
     get_youtube_client,
+    get_current_user
 )
 from app.clients.youtube_client import YouTubeClient
 from app.core import settings
 from app.repositories.comment_analysis_cache_repository import CommentAnalysisCacheRepository
-from app.repositories.user_repository import UserRepository
+from app.repositories.user import UserRepository
 from app.repositories.video_analysis_cache_repository import VideoAnalysisCacheRepository
-from app.schemas import TextInput, AnalysisResult, YoutubeAnalysisResponse, YoutubeAnalysisRequest
+from app.schemas import TextAnalysisRequest, AnalysisResult, YoutubeAnalysisResponse, YoutubeAnalysisRequest
 from app.services.comment_filtering_service import CommentFilteringService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/{user_id}/text-analyses", response_model=AnalysisResult, summary="?â‘¥ì”ª ?ë¿ë’ª???ê¾©ê»œ éºê¾©ê½")
+@router.post("/text", response_model=AnalysisResult, summary="?â‘¥ì”ª ?ë¿ë’ª???ê¾©ê»œ éºê¾©ê½")
 async def analyze_single_text(
-    user_id: int,
-    input_data: TextInput = Body(
+    user_id: int = Depends(get_current_user),
+    input_data: TextAnalysisRequest = Body(
         ...,
         json_schema_extra={
             "example": {"text": "?ì‡±ì”  åª›ì’–ê¹‰?ì‡±ë¹ž ?ë—£ë€‘ ?ëˆê½• ï§ž?äºŒì‡±ëƒ¼ ???ëª„ë¿€??010-1234-5678 è«›ã…ºë§Œ è­°ê³—ë––?ëŒ€ì”ª"}
@@ -60,9 +61,9 @@ async def analyze_single_text(
         raise HTTPException(status_code=500, detail="?ì’•ì¾­ ?ëŒ€? ?ã…»ìªŸåª›Â€ è«›ì’–ê¹®?ë‰ë’¿?ëˆë–Ž.")
 
 
-@router.post("/{user_id}/youtube-analyses", response_model=YoutubeAnalysisResponse, summary="?ì¢ë’ é‡‰??ê³¸ê¸½ ?ë³¤? éºê¾©ê½")
+@router.post("/youtube", response_model=YoutubeAnalysisResponse, summary="?ì¢ë’ é‡‰??ê³¸ê¸½ ?ë³¤? éºê¾©ê½")
 async def analyze_youtube_video(
-    user_id: int,
+    user_id: int = Depends(get_current_user),
     req: YoutubeAnalysisRequest = Body(...),
     filtering_service: CommentFilteringService = Depends(get_comment_filtering_service),
     yt_client: YouTubeClient = Depends(get_youtube_client),

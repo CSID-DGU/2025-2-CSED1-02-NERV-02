@@ -78,11 +78,9 @@ const transformToBackendUpdate = (settings: AppSettings) => {
 
 // 1. 설정 조회 Hook (Config API)
 export const useSettings = () => {
-  const userId = 1; // TODO: 나중에 실제 로그인 시스템 연동
-  
   return useQuery({
-    queryKey: ['system-config', userId],
-    queryFn: () => fetchSystemConfig(userId),
+    queryKey: ['system-config'],
+    queryFn: () => fetchSystemConfig(),
     select: transformToAppSettings,
     // 초기값에서 SystemConfigResponse 형태를 맞춰줌
     initialData: { 
@@ -100,12 +98,11 @@ export const useSettings = () => {
 // 2. 설정 업데이트 Hook (Config API)
 export const useUpdateSettings = () => {
   const queryClient = useQueryClient();
-  const userId = 1; // TODO: 나중에 실제 로그인 시스템 연동
 
   return useMutation({
     mutationFn: (newSettings: AppSettings) => {
       const payload = transformToBackendUpdate(newSettings);
-      return updateSystemConfig(userId, payload);
+      return updateSystemConfig(payload);
     },
     
     // 낙관적 업데이트
@@ -131,14 +128,12 @@ export const useUpdateSettings = () => {
 
 // 1. 조회 Hook
 export const useDictionary = () => {
-  const userId = 1; // TODO: 나중에 실제 로그인 시스템 연동
-  
   return useQuery({
-    queryKey: ['system-dictionary', userId],
+    queryKey: ['system-dictionary'],
     queryFn: async () => {
       try {
         // 백엔드가 이제 whitelist + blacklist를 한 번에 반환
-        const result = await fetchDictionary(userId);
+        const result = await fetchDictionary();
         
         return {
           whitelist: result.whitelist || [],
@@ -157,11 +152,10 @@ export const useDictionary = () => {
 // 2. 추가 Hook (POST) - [서버 죽어도 화면엔 추가됨]
 export const useAddDictionaryWord = () => {
   const queryClient = useQueryClient();
-  const userId = 1; // TODO: 나중에 실제 로그인 시스템 연동
 
   return useMutation({
     mutationFn: (req: DictionaryRequest) => 
-      addDictionaryWord(userId, req.list_type, req.words),
+      addDictionaryWord(req.list_type, req.words),
     
     // 낙관적 업데이트 (추가)
     onMutate: async (newWordReq) => {
@@ -185,11 +179,10 @@ export const useAddDictionaryWord = () => {
 // 3. 삭제 Hook (DELETE) - [서버 죽어도 화면엔 반영됨]
 export const useDeleteDictionaryWord = () => {
   const queryClient = useQueryClient();
-  const userId = 1; // TODO: 나중에 실제 로그인 시스템 연동
 
   return useMutation({
     mutationFn: (req: DictionaryRequest) => 
-      deleteDictionaryWord(userId, req.list_type, req.words),
+      deleteDictionaryWord(req.list_type, req.words),
     
     // 낙관적 업데이트 (삭제)
     onMutate: async (delWordReq) => {

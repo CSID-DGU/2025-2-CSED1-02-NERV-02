@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     YOUTUBE_API_KEY: str
     OPENAI_API_KEY: str
 
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
     DEBUG_MODE: bool = False
     VIDEO_ANALYSIS_CACHE_TTL_SECONDS: int = 3600
 

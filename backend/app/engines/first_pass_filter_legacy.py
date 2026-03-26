@@ -1,7 +1,7 @@
 import re
 import logging
 from konlpy.tag import Okt
-from app.repositories.dictionary_repository import DictionaryRepository
+from app.repositories.dictionary import DictionaryRepository
 
 logger = logging.getLogger(__name__)
 

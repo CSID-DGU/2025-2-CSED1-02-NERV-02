@@ -12,7 +12,6 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        // 팝업 페이지 엔트리 포인트 설정
         popup: resolve(__dirname, 'popup.html'),
         background: resolve(__dirname, 'src/background/service-worker.ts'), 
         content: resolve(__dirname, 'src/content/content-script.tsx'),

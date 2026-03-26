@@ -3,16 +3,16 @@ from dotenv import set_key, find_dotenv
 
 from app.core import settings
 from app.schemas import (
-    ListTypeParam,
+    ListType,
     DictionaryWordsRequest, DictionaryResponse, DictionaryUpdateResponse,
     UserSettingsResponse, UserSettingsUpdate
 )
 
-from app.api.deps import get_dictionary_service, get_first_pass_filter, get_user_repository
+from app.api.deps import get_dictionary_service, get_first_pass_filter, get_user_repository, get_current_user
 
 from app.services.dictionary_service import DictionaryService, ListType
 from app.engines.first_pass_filter import FirstPassFilter
-from app.repositories.user_repository import UserRepository
+from app.repositories.user import UserRepository
 
 router = APIRouter()
 
@@ -20,9 +20,9 @@ router = APIRouter()
 # [API] 시스템 설정 관리 API (System Config APIs)
 # =========================================================
 
-@router.get("/{user_id}/dictionaries", response_model=DictionaryResponse, summary="사용자 사전 전체 조회")
+@router.get("/dictionaries", response_model=DictionaryResponse, summary="사용자 사전 전체 조회")
 async def get_user_dictionaries(
-    user_id: int,
+    user_id: int = Depends(get_current_user),
     dict_service: DictionaryService = Depends(get_dictionary_service)
 ):
     """
@@ -40,11 +40,11 @@ async def get_user_dictionaries(
         "total_count": len(whitelist) + len(blacklist)
     }
 
-@router.post("/{user_id}/dictionaries/{list_type}", response_model=DictionaryUpdateResponse, summary="사전에 단어 추가")
+@router.post("/dictionaries/{list_type}", response_model=DictionaryUpdateResponse, summary="사전에 단어 추가")
 async def add_dictionary_words(
-    user_id: int,  
-    list_type: ListTypeParam,
+    list_type: ListType,
     req: DictionaryWordsRequest,
+    user_id: int = Depends(get_current_user),
     dict_service: DictionaryService = Depends(get_dictionary_service),
     first_filter: FirstPassFilter = Depends(get_first_pass_filter)
 ):
@@ -73,11 +73,11 @@ async def add_dictionary_words(
         }
     }
 
-@router.delete("/{user_id}/dictionaries/{list_type}", response_model=DictionaryUpdateResponse, summary="단어 일괄 삭제")
+@router.delete("/dictionaries/{list_type}", response_model=DictionaryUpdateResponse, summary="단어 일괄 삭제")
 async def remove_dictionary_words(
-    user_id: int,
-    list_type: ListTypeParam,
+    list_type: ListType,
     req: DictionaryWordsRequest,
+    user_id: int = Depends(get_current_user),
     dict_service: DictionaryService = Depends(get_dictionary_service),
     first_filter: FirstPassFilter = Depends(get_first_pass_filter)
 ):
@@ -105,9 +105,9 @@ async def remove_dictionary_words(
         }
     }
 
-@router.get("/{user_id}/settings", response_model=UserSettingsResponse, summary="유저 개인 설정 조회")
+@router.get("/settings", response_model=UserSettingsResponse, summary="유저 개인 설정 조회")
 async def get_user_settings(
-    user_id: int,
+    user_id: int = Depends(get_current_user),
     user_repo: UserRepository = Depends(get_user_repository)
 ):
     """사용자 필터링 설정을 조회합니다."""
@@ -124,10 +124,10 @@ async def get_user_settings(
         "enabled_modules": user.enabled_modules
     }
 
-@router.patch("/{user_id}/settings", summary="유저 개인 필터링 설정 변경")
+@router.patch("/settings", summary="유저 개인 필터링 설정 변경")
 async def update_user_settings(
-    user_id: int,
     req: UserSettingsUpdate,
+    user_id: int = Depends(get_current_user),
     user_repo: UserRepository = Depends(get_user_repository)
 ):
     """사용자 필터링 설정을 부분 업데이트합니다 (PATCH)."""

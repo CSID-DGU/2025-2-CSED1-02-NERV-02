@@ -10,6 +10,7 @@ class User(Base):
     
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(50), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
     
     security_level: Mapped[int] = mapped_column(default=3)           
     risk_threshold: Mapped[float] = mapped_column(default=0.65)          
@@ -19,9 +20,9 @@ class User(Base):
     basic_threshold: Mapped[float] = mapped_column(Float, default=0.9)
     enabled_modules: Mapped[str] = mapped_column(String(255), default="ALL")
 
-    youtube_channel_id: Mapped[str | None] = mapped_column(String(100), unique=True)
-    youtube_channel_name: Mapped[str | None] = mapped_column(String(100))            
-    youtube_channel_url: Mapped[str | None] = mapped_column(String(255))             
+    youtube_channel_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
+    youtube_channel_name: Mapped[str | None] = mapped_column(String(100), nullable=True)            
+    youtube_channel_url: Mapped[str | None] = mapped_column(String(255), nullable=True)             
     is_active: Mapped[bool] = mapped_column(default=True)                            
 
     created_at: Mapped[datetime] = mapped_column(default=func.now())

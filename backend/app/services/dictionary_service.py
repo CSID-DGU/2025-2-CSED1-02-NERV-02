@@ -1,6 +1,6 @@
 import logging
 from enum import Enum
-from app.repositories.dictionary_repository import DictionaryRepository
+from app.repositories.dictionary import DictionaryRepository
 
 logger = logging.getLogger(__name__)
 

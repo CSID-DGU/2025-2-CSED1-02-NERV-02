@@ -1,5 +1,5 @@
 import logging
-from app.repositories.user_repository import UserRepository
+from app.repositories.user import UserRepository
 from app.engines.first_pass_filter import FirstPassFilter
 from app.engines.second_pass_filter import SecondPassFilter
 from app.engines.risk_scorer import RiskScorer

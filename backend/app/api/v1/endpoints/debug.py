@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, Body, Depends, Query
 import logging
 
 from app.schemas import (
-    TextInput, FirstPassResponse, SecondPassResponse,
-    RiskResponse, PolicyInput, PolicyResponse
+    TextAnalysisRequest, FirstPassResponse, SecondPassResponse,
+    RiskResponse, PolicyRequest, PolicyResponse
 )
 from app.api.deps import (
     get_first_pass_filter, get_second_pass_filter,
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 @router.post("/users/{user_id}/first-pass", response_model=FirstPassResponse, summary="Step 1. 1차 필터링")
 async def run_first_pass(
     user_id: int,
-    input_data: TextInput,
+    input_data: TextAnalysisRequest,
     first_filter: FirstPassFilter = Depends(get_first_pass_filter)
 ):
     try:
@@ -96,7 +96,7 @@ async def calculate_risk_score(
 async def decide_policy(
     user_security_level: int = Body(3, description="유저 보안 레벨 (테스트용)"),
     user_risk_threshold: float = Body(0.65, description="유저 임계값 (테스트용)"),
-    data: PolicyInput = Body(
+    data: PolicyRequest = Body(
         ...,
         # [입력 예시] 계산된 점수와 최종 필터링 결과
         json_schema_extra={

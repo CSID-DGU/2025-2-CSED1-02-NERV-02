@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 from app.core import settings
-from app.api.v1.endpoints import debug, users, analyses
+from app.api.v1.endpoints import debug, users, analyses, auth
 
 api_router = APIRouter()
 
+api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(users.router, prefix="/users", tags=["User Management"])
 api_router.include_router(analyses.router, prefix="/analyses", tags=["Content Analysis"])
 
