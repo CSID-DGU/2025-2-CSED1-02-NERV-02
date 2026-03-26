@@ -1,4 +1,5 @@
 import re
+import hashlib
 import logging
 import ahocorasick
 from typing import List, Dict, Set, Tuple
@@ -8,16 +9,21 @@ from app.repositories.dictionary import DictionaryRepository
 logger = logging.getLogger(__name__)
 
 class FirstPassFilter:
-    def __init__(self, repo: DictionaryRepository):
-        self.dict_repo = repo
+    def __init__(self):
         self.automaton = ahocorasick.Automaton()
-      
-    async def reload_engine(self, user_id: int):
+        self._cached_hash: str | None = None
+
+    async def reload_engine(self, user_id: int, repo: DictionaryRepository):
+        user_whitelist, user_blacklist = await repo.load_user_dict(user_id)
+        system_dictionary = await repo.load_system_dict()
+
+        all_words = sorted(user_whitelist) + sorted(user_blacklist) + sorted(system_dictionary)
+        current_hash = hashlib.md5("|".join(all_words).encode()).hexdigest()
+
+        if self._cached_hash == current_hash:
+            return
 
         logger.info(f"[FirstPassFilter] 유저({user_id}) 전용 엔진 조립 시작...")
-        
-        user_whitelist, user_blacklist = await self.dict_repo.load_user_dict(user_id)
-        system_dictionary = await self.dict_repo.load_system_dict()
         
         new_automaton = ahocorasick.Automaton()
         
@@ -31,6 +37,7 @@ class FirstPassFilter:
         if len(new_automaton) > 0:
             new_automaton.make_automaton()
             self.automaton = new_automaton
+            self._cached_hash = current_hash
             logger.info(f"유저({user_id}) 엔진 조립 완료 (총 {len(new_automaton)}개 단어)")
         else:
             logger.warning(f"유저({user_id})의 사전 데이터가 비어있습니다.")

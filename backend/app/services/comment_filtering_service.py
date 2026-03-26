@@ -1,4 +1,6 @@
 import logging
+from app.db.database import AsyncSessionLocal
+from app.repositories.dictionary import DictionaryRepository
 from app.repositories.user import UserRepository
 from app.engines.first_pass_filter import FirstPassFilter
 from app.engines.second_pass_filter import SecondPassFilter
@@ -23,13 +25,16 @@ class CommentFilteringService:
         self.policy = policy
 
     async def process_comment(self, user_id: int, comment_text: str) -> dict:
-        logger.info(f"유저({user_id}) 댓글 검사 파이프라인 시작")
+        preview = comment_text[:20].replace("\n", " ")
+        logger.info(f"댓글(\"{preview}\") 필터링 검사 시작")
 
         user = await self.user_repo.get_user_settings(user_id)
         if not user:
             return {"action": "ERROR", "reason": "USER_NOT_FOUND"}
 
-        await self.first_pass.reload_engine(user_id)
+        async with AsyncSessionLocal() as session:
+            repo = DictionaryRepository(session)
+            await self.first_pass.reload_engine(user_id, repo)
 
         filter_result = self.first_pass.execute(comment_text)
         # filter_result = self.second_pass.execute(filter_result)

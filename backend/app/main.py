@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from app.core.logging import setup_logging
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
+from app.engines.first_pass_filter import FirstPassFilter
 
 from app.api.v1.api import api_router
 from app.db import Base, engine
@@ -9,9 +10,10 @@ from app.db import models as _models
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    app.state.first_pass_filter = FirstPassFilter()
     yield
 
 setup_logging()

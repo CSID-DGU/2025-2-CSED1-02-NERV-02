@@ -1,5 +1,5 @@
 import os
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,8 +36,8 @@ async def get_comment_analysis_cache_repository(
     return CommentAnalysisCacheRepository(session)
 
 # --- [Engines] ---
-async def get_first_pass_filter(repo: DictionaryRepository = Depends(get_dictionary_repository)) -> FirstPassFilter:
-    return FirstPassFilter(repo=repo)
+def get_first_pass_filter(request: Request) -> FirstPassFilter:
+    return request.app.state.first_pass_filter
 
 async def get_second_pass_filter() -> SecondPassFilter:
     return SecondPassFilter()
