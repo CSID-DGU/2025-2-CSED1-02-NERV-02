@@ -4,11 +4,9 @@ import type { AppSettings } from '../api/types';
 
 // 1. 유튜브 분석 데이터 쿼리
 export const useYoutubeAnalysis = (videoId: string | null) => {
-  const userId = 1; // TODO: 나중에 실제 로그인 시스템 연동
-  
   return useQuery({
-    queryKey: ['youtube-analysis', userId, videoId],
-    queryFn: () => fetchAnalysis(userId, videoId!),
+    queryKey: ['youtube-analysis', videoId],
+    queryFn: () => fetchAnalysis(videoId!),
     enabled: !!videoId,
     staleTime: 1000 * 60,
   });
