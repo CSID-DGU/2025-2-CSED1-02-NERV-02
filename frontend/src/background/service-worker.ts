@@ -25,7 +25,20 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 // 메시지 리스너
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  console.log('[Background] 메시지 수신:', message);
-   sendResponse({ status: 'ok' });
-   return true;
+  if (message.type === 'FETCH_ANALYSIS') {
+    chrome.storage.local.get('access_token').then(({ access_token }) => {
+      fetch('http://localhost:8000/api/analyses/youtube', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${access_token}`
+        },
+        body: JSON.stringify({ video_id: message.videoId })
+      })
+        .then(r => r.json())
+        .then(data => sendResponse({ ok: true, results: data.results ?? [] }))
+        .catch(e => sendResponse({ ok: false, error: String(e) }));
+    });
+    return true; // 비동기 응답을 위해 반드시 필요
+  }
 });

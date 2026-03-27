@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/layout/TabNavigation';
 import ChatTab from '../features/chat/ChatTab';
@@ -23,8 +23,7 @@ const LoginView = ({ onLogin, onGoRegister }: { onLogin: () => void; onGoRegiste
     setLoading(true);
     try {
       const data = await login(username, password);
-      localStorage.setItem('access_token', data.access_token);
-      localStorage.setItem('user_id', String(data.user_id));
+      await chrome.storage.local.set({ access_token: data.access_token, user_id: String(data.user_id) });
       onLogin();
     } catch (err: any) {
       setError(err.response?.data?.detail || '로그인 실패');
@@ -99,8 +98,7 @@ const RegisterView = ({ onRegister, onGoLogin }: { onRegister: () => void; onGoL
     setLoading(true);
     try {
       const data = await register(username, password);
-      localStorage.setItem('access_token', data.access_token);
-      localStorage.setItem('user_id', String(data.user_id));
+      await chrome.storage.local.set({ access_token: data.access_token, user_id: String(data.user_id) });
       onRegister();
     } catch (err: any) {
       setError(err.response?.data?.detail || '회원가입 실패');
@@ -193,13 +191,16 @@ const AppView = ({ onLogout }: { onLogout: () => void }) => {
 
 // --- 루트 컴포넌트 ---
 const Popup = () => {
-  const [view, setView] = useState<View>(() =>
-    localStorage.getItem('access_token') ? 'app' : 'login'
-  );
+  const [view, setView] = useState<View>('login');
 
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user_id');
+  useEffect(() => {
+    chrome.storage.local.get('access_token').then(({ access_token }) => {
+      if (access_token) setView('app');
+    });
+  }, []);
+
+  const handleLogout = async () => {
+    await chrome.storage.local.remove(['access_token', 'user_id']);
     setView('login');
   };
 

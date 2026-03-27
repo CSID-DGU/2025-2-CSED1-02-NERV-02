@@ -10,24 +10,22 @@ const client = axios.create({
 
 // Axios interceptor - 모든 요청에 토큰 자동 추가
 client.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    const { access_token } = await chrome.storage.local.get('access_token');
+    if (access_token) {
+      config.headers.Authorization = `Bearer ${access_token}`;
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Axios interceptor - 401 에러 시 로그인 페이지로 리다이렉트
+// Axios interceptor - 401 에러 시 토큰 제거
 client.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user_id');
-      window.location.href = '/login';
+      await chrome.storage.local.remove(['access_token', 'user_id']);
     }
     return Promise.reject(error);
   }
