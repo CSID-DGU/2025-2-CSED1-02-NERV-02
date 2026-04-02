@@ -7,6 +7,7 @@ from app.services.filtering.first_pass_filter import FirstPassFilter
 from app.services.filtering.second_pass_filter import SecondPassFilter
 from app.services.filtering.risk_scorer import RiskScorer
 from app.services.filtering.policy_manager import PolicyManager
+from app.services.filtering.keyword_extractor import KeywordExtractor
 
 from app.repositories.dictionary import load_system_dict
 from app.api.v1.api import api_router
@@ -25,7 +26,8 @@ async def lifespan(app: FastAPI):
     app.state.second_pass_filter = SecondPassFilter()
     app.state.risk_scorer = RiskScorer()
     app.state.policy_manager = PolicyManager()
-    
+    app.state.keyword_extractor = KeywordExtractor()
+
     yield
 
 setup_logging()

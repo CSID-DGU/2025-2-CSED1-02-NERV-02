@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchSystemConfig, updateSystemConfig, addDictionaryWord, fetchDictionary, deleteDictionaryWord } from '../api/services';
+import { fetchSystemConfig, updateSystemConfig, addDictionaryWord, fetchDictionary, deleteDictionaryWord, linkYoutubeChannel, unlinkYoutubeChannel } from '../api/services';
 import type { AppSettings, SystemConfigResponse, DictionaryRequest } from '../api/types';
 
 const MODULE_MAP: Record<keyof AppSettings['modules'], string> = {
@@ -83,14 +83,54 @@ export const useSettings = () => {
     queryFn: () => fetchSystemConfig(),
     select: transformToAppSettings,
     // 초기값에서 SystemConfigResponse 형태를 맞춰줌
-    initialData: { 
-      user_id: 1,  // 추가
-      security_level: 3, 
-      enabled_modules: 'ALL',  // 문자열로 변경
-      risk_threshold: 0.65, 
+    initialData: {
+      user_id: 1,
+      security_level: 3,
+      enabled_modules: 'ALL',
+      risk_threshold: 0.65,
       use_detail_ai_model: false,
-    } as SystemConfigResponse, 
+      youtube_channel_id: null,
+      youtube_channel_name: null,
+      youtube_channel_url: null,
+      youtube_thumbnail_url: null,
+    } as SystemConfigResponse,
     staleTime: Infinity,
+  });
+};
+
+// YouTube 채널 정보 조회 (settings에서 추출)
+export const useYoutubeChannel = () => {
+  return useQuery({
+    queryKey: ['system-config'],
+    queryFn: () => fetchSystemConfig(),
+    select: (data: SystemConfigResponse) => ({
+      channel_id: data.youtube_channel_id,
+      channel_name: data.youtube_channel_name,
+      channel_url: data.youtube_channel_url,
+      thumbnail_url: data.youtube_thumbnail_url,
+    }),
+  });
+};
+
+// YouTube 채널 연동
+export const useLinkYoutubeChannel = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (channelId: string) => linkYoutubeChannel(channelId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['system-config'] });
+    },
+  });
+};
+
+// YouTube 채널 연동 해제
+export const useUnlinkYoutubeChannel = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => unlinkYoutubeChannel(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['system-config'] });
+    },
   });
 };
 
@@ -171,6 +211,11 @@ export const useAddDictionaryWord = () => {
       });
     },
     onSuccess: () => {
+      // 분석 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ['text-analysis'] });
+      if (typeof chrome !== 'undefined' && chrome.storage?.session) {
+        chrome.storage.session.remove('guard-filter-analysis');
+      }
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) chrome.tabs.sendMessage(tabs[0].id, { type: 'DICTIONARY_UPDATED' });
       });
@@ -209,6 +254,11 @@ export const useDeleteDictionaryWord = () => {
       });
     },
     onSuccess: () => {
+      // 분석 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ['text-analysis'] });
+      if (typeof chrome !== 'undefined' && chrome.storage?.session) {
+        chrome.storage.session.remove('guard-filter-analysis');
+      }
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) chrome.tabs.sendMessage(tabs[0].id, { type: 'DICTIONARY_UPDATED' });
       });

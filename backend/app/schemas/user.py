@@ -10,6 +10,7 @@ class UserSettingsUpdate(BaseModel):
     youtube_channel_id: Optional[str] = Field(None, description="YouTube 채널 ID")
     youtube_channel_name: Optional[str] = Field(None, description="YouTube 채널 이름")
     youtube_channel_url: Optional[str] = Field(None, description="YouTube 채널 URL")
+    youtube_thumbnail_url: Optional[str] = Field(None, description="YouTube 채널 프로필 이미지 URL")
 
 class UserSettingsResponse(BaseModel):
     """사용자 필터링 설정 조회 응답"""
@@ -21,3 +22,4 @@ class UserSettingsResponse(BaseModel):
     youtube_channel_id: Optional[str] = None
     youtube_channel_name: Optional[str] = None
     youtube_channel_url: Optional[str] = None
+    youtube_thumbnail_url: Optional[str] = None

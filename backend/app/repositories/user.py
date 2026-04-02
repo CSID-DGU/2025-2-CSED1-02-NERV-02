@@ -13,7 +13,7 @@ class UserRepository:
 
     async def update_settings(self, user: User, data: dict) -> None:
         for field, value in data.items():
-            if value is not None and hasattr(user, field):
+            if hasattr(user, field):
                 setattr(user, field, value)
         await self.session.commit()
 

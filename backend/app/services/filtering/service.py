@@ -24,16 +24,12 @@ class TextAnalysisService:
         self.policy = policy
         self.dict_repo = dict_repo
 
-    async def analyze_text(self, user: User, text: str) -> TextAnalysisResponse:
+    def _analyze_single(self, user: User, text: str, dicts) -> TextAnalysisResponse:
         preview = text[:20].replace("\n", " ")
         logger.info(f"댓글(\"{preview}\") 필터링 검사 시작")
 
-        dicts = await self.dict_repo.load_dictionaries(user.id)
-
         filter_result = self.first_pass.execute(text, dicts.whitelist, dicts.blacklist, dicts.system_dict)
 
-        if user.use_detail_ai_model:
-            filter_result = await self.second_pass.execute(filter_result)
         risk_score = self.scorer.execute(filter_result)
         final_decision = self.policy.decide_action(
             risk_score=risk_score,
@@ -51,3 +47,11 @@ class TextAnalysisService:
             score=risk_score,
             details=FilterResult.model_validate(filter_result),
         )
+
+    async def analyze_text(self, user: User, text: str) -> TextAnalysisResponse:
+        dicts = await self.dict_repo.load_dictionaries(user.id)
+        return self._analyze_single(user, text, dicts)
+
+    async def analyze_texts(self, user: User, texts: list[str]) -> list[TextAnalysisResponse]:
+        dicts = await self.dict_repo.load_dictionaries(user.id)
+        return [self._analyze_single(user, text, dicts) for text in texts]

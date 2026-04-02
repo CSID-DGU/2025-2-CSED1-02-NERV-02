@@ -14,6 +14,7 @@ from app.services.filtering.first_pass_filter import FirstPassFilter
 from app.services.filtering.second_pass_filter import SecondPassFilter
 from app.services.filtering.risk_scorer import RiskScorer
 from app.services.filtering.policy_manager import PolicyManager
+from app.services.filtering.keyword_extractor import KeywordExtractor
 from app.services.filtering.service import TextAnalysisService
 from app.services.dictionary_service import DictionaryService
 from app.services.youtube_analysis_service import YoutubeAnalysisService
@@ -60,6 +61,9 @@ def get_risk_scorer(request: Request) -> RiskScorer:
 
 def get_policy_manager(request: Request) -> PolicyManager:
     return request.app.state.policy_manager
+
+def get_keyword_extractor(request: Request) -> KeywordExtractor:
+    return request.app.state.keyword_extractor
 
 # --- [Services] ---
 async def get_dictionary_service(repo: DictionaryRepository = Depends(get_dictionary_repository)) -> DictionaryService:

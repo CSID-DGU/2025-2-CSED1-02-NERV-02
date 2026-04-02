@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { YoutubeAnalysisResponse, TextAnalysisResponse, RawComment, SystemConfigResponse, SystemConfigUpdate, DictionaryResponse, DictionaryUpdateResponse } from './types';
+import type { YoutubeAnalysisResponse, TextAnalysisResponse, RawComment, SystemConfigResponse, SystemConfigUpdate, DictionaryResponse, DictionaryUpdateResponse, KeywordAnalysisResponse, YoutubeChannelInfo } from './types';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -54,9 +54,9 @@ export const getCurrentUser = async (): Promise<{ user_id: number; username: str
 // --- API FUNCTIONS ---
 
 // 1. 유튜브 영상 댓글 수집
-export const fetchAnalysis = async (videoId: string, maxPages: number = 1): Promise<YoutubeAnalysisResponse> => {
+export const fetchAnalysis = async (videoId: string): Promise<YoutubeAnalysisResponse> => {
   const response = await client.get(`/api/analyses/youtube`, {
-    params: { video_id: videoId, max_pages: maxPages }
+    params: { video_id: videoId }
   });
   return response.data;
 };
@@ -101,4 +101,21 @@ export const deleteDictionaryWord = async (listType: 'whitelist' | 'blacklist', 
     { data: { words } }
   );
   return response.data;
+};
+
+// 7. 키워드 분석 (POST)
+export const fetchKeywordAnalysis = async (comments: RawComment[]): Promise<KeywordAnalysisResponse> => {
+  const response = await client.post<KeywordAnalysisResponse>('/api/analyses/keywords', comments);
+  return response.data;
+};
+
+// 8. YouTube 채널 연동
+export const linkYoutubeChannel = async (channelId: string): Promise<YoutubeChannelInfo> => {
+  const response = await client.put<YoutubeChannelInfo>('/api/users/youtube-channel', { channel_id: channelId });
+  return response.data;
+};
+
+// 9. YouTube 채널 연동 해제
+export const unlinkYoutubeChannel = async (): Promise<void> => {
+  await client.delete('/api/users/youtube-channel');
 };

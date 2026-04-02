@@ -69,7 +69,7 @@ const ChatTab = () => {
 
         // 2. [Step 4. Policy Manager] 서버의 정책 판단 확인 (Server Action)
         // - 백엔드에서 보안 레벨과 위험 점수를 계산해 내린 최종 처분
-        const isServerHidden = comment.action === 'AUTO_HIDE' || comment.action === 'PERMANENT_DELETE';
+        const isServerFiltered = comment.action !== 'PASS';
 
         // 3. [UI_REQ_004] 클라이언트 로컬 블랙리스트 확인 (Local Blacklist)
         // - 서버 응답과 무관하게 사용자가 지정한 단어는 즉시 차단
@@ -79,7 +79,7 @@ const ChatTab = () => {
 
         // 4. [최종 판별] 이중 필터링 로직 (Dual-Check)
         // - 화이트리스트가 아니면서, (서버가 숨기라고 했거나 OR 로컬 블랙리스트에 걸렸거나)
-        const shouldBlur = !isWhitelisted && (isServerHidden || isLocalBlacklisted);
+        const shouldBlur = !isWhitelisted && (isServerFiltered || isLocalBlacklisted);
 
         // =================================================================================
 

@@ -1,3 +1,4 @@
+import math
 import logging
 from typing import Optional, Any
 from googleapiclient.discovery import build
@@ -34,7 +35,7 @@ class YoutubeAnalysisService:
 
         try:
             request = self.youtube.videos().list(
-                part="snippet,topicDetails",
+                part="snippet,statistics,topicDetails",
                 id=video_id
             )
             response = request.execute()
@@ -45,6 +46,7 @@ class YoutubeAnalysisService:
 
             item = response['items'][0]
             snippet = item.get('snippet', {})
+            statistics = item.get('statistics', {})
             topic_details = item.get('topicDetails', {})
 
             return {
@@ -54,6 +56,9 @@ class YoutubeAnalysisService:
                     "description": snippet.get("description"),
                     "tags": snippet.get("tags", []),
                     "categoryId": snippet.get("categoryId"),
+                },
+                "statistics": {
+                    "commentCount": int(statistics.get("commentCount", 0)),
                 },
                 "topicDetails": {
                     "topicCategories": topic_details.get("topicCategories", [])
@@ -67,10 +72,19 @@ class YoutubeAnalysisService:
             logger.error(f"Unknown Error: {e}")
             return None
 
-    def get_comments(self, video_id: str, max_pages: int = 1) -> list[dict[str, Any]]:
-        """댓글 데이터 수집"""
+    def get_comments(self, video_id: str, max_pages: int | None = None, comment_count: int = 0) -> list[dict[str, Any]]:
+        """댓글 데이터 수집. max_pages=None이면 commentCount 기반 자동 계산 (상한 50페이지)."""
         if not self.youtube:
             return []
+
+        MAX_PAGES_CAP = 50  # 안전 상한선 (5,000개)
+
+        if max_pages is not None:
+            effective_pages = min(max_pages, MAX_PAGES_CAP)
+        elif comment_count > 0:
+            effective_pages = min(math.ceil(comment_count / 100), MAX_PAGES_CAP)
+        else:
+            effective_pages = 10  # fallback
 
         comments_list = []
         try:
@@ -80,9 +94,9 @@ class YoutubeAnalysisService:
                 maxResults=100,
                 order="relevance"
             )
-            
+
             page_count = 0
-            while request and page_count < max_pages:
+            while request and page_count < effective_pages:
                 response = request.execute()
                 
                 for item in response['items']:
@@ -112,6 +126,33 @@ class YoutubeAnalysisService:
             logger.error(f"Unknown Error: {e}")
             return []
         
+    def get_channel_info(self, channel_id: str) -> dict[str, Any] | None:
+        """채널 ID로 채널 정보 조회 (이름, 프로필 사진 등)"""
+        if not self.youtube:
+            return None
+
+        try:
+            request = self.youtube.channels().list(
+                part="snippet",
+                id=channel_id
+            )
+            response = request.execute()
+
+            if not response.get('items'):
+                return None
+
+            snippet = response['items'][0]['snippet']
+            return {
+                "channel_id": channel_id,
+                "channel_name": snippet.get("title"),
+                "channel_url": f"https://youtube.com/channel/{channel_id}",
+                "thumbnail_url": snippet.get("thumbnails", {}).get("default", {}).get("url"),
+            }
+
+        except Exception as e:
+            logger.error(f"채널 정보 조회 실패: {e}")
+            return None
+
     def verify_channel(self, video_info: dict, channel_id: str) -> bool:
         """영상이 특정 채널 소유인지 검증"""
         return video_info["snippet"].get("channelId") == channel_id

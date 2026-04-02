@@ -2,12 +2,14 @@ let filterResults: Array<{ original: string; processed: string; action: string }
 let currentVideoId: string | null = null;
 let observer: MutationObserver | null = null;
 
+const COMMENT_SELECTOR = 'ytd-comment-view-model span.yt-core-attributed-string--white-space-pre-wrap[role="text"]';
+
 function getVideoId(): string | null {
     return new URLSearchParams(window.location.search).get('v');
 }
 
 function applyFilter() {
-    document.querySelectorAll('ytd-comment-view-model span.yt-core-attributed-string--white-space-pre-wrap[role="text"]').forEach(el => {
+    document.querySelectorAll(COMMENT_SELECTOR).forEach(el => {
         const htmlEl = el as HTMLElement;
         if (htmlEl.dataset.filtered) return;
 
@@ -69,6 +71,7 @@ chrome.runtime.onMessage.addListener((message) => {
         document.querySelectorAll<HTMLElement>('[data-filtered]').forEach(el => {
             delete el.dataset.filtered;
         });
+        filterResults = [];
         fetchFilterResults(currentVideoId);
     }
 });

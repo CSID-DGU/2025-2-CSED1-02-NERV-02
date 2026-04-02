@@ -20,8 +20,9 @@ class User(Base):
     enabled_modules: Mapped[str] = mapped_column(String(255), default="ALL")
 
     youtube_channel_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
-    youtube_channel_name: Mapped[str | None] = mapped_column(String(100), nullable=True)            
-    youtube_channel_url: Mapped[str | None] = mapped_column(String(255), nullable=True)             
+    youtube_channel_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    youtube_channel_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    youtube_thumbnail_url: Mapped[str | None] = mapped_column(String(500), nullable=True)             
     is_active: Mapped[bool] = mapped_column(default=True)                            
 
     created_at: Mapped[datetime] = mapped_column(default=func.now())

@@ -58,6 +58,39 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ ok: false, error: String(e) });
       }
     });
-    return true; // 비동기 응답을 위해 반드시 필요
+    return true;
+  }
+
+  if (message.type === 'ANALYZE_TEXTS') {
+    chrome.storage.local.get('access_token').then(async ({ access_token }) => {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${access_token}`
+      };
+      try {
+        const comments = message.texts.map((text: string, i: number) => ({
+          comment_id: `dom-${i}`,
+          text,
+          author: '',
+          published_at: '',
+        }));
+        const res = await fetch('http://localhost:8000/api/analyses/text', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(comments)
+        });
+        if (!res.ok) { sendResponse({ ok: false, error: `Text API error: ${res.status}` }); return; }
+        const data: Array<{ original_text: string; processed_text: string; action: string }> = await res.json();
+        const results = data.map(r => ({
+          original: r.original_text,
+          processed: r.processed_text,
+          action: r.action,
+        }));
+        sendResponse({ ok: true, results });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    });
+    return true;
   }
 });

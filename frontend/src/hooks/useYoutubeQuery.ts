@@ -15,17 +15,21 @@ export const useYoutubeAnalysis = (videoId: string | null) => {
 
 const ANALYSIS_STORAGE_KEY = 'guard-filter-analysis';
 
+const CACHE_TTL = 5 * 60 * 1000; // 5분
+
 const saveAnalysisToStorage = async (videoId: string, data: FullAnalysisResponse) => {
   if (typeof chrome !== 'undefined' && chrome.storage?.session) {
-    await chrome.storage.session.set({ [ANALYSIS_STORAGE_KEY]: { videoId, data } });
+    await chrome.storage.session.set({ [ANALYSIS_STORAGE_KEY]: { videoId, data, cachedAt: Date.now() } });
   }
 };
 
 const loadAnalysisFromStorage = async (videoId: string): Promise<FullAnalysisResponse | null> => {
   if (typeof chrome !== 'undefined' && chrome.storage?.session) {
     const result = await chrome.storage.session.get(ANALYSIS_STORAGE_KEY);
-    const cached = result[ANALYSIS_STORAGE_KEY] as { videoId: string; data: FullAnalysisResponse } | undefined;
-    if (cached && cached.videoId === videoId) return cached.data;
+    const cached = result[ANALYSIS_STORAGE_KEY] as { videoId: string; data: FullAnalysisResponse; cachedAt?: number } | undefined;
+    if (cached && cached.videoId === videoId && cached.cachedAt && Date.now() - cached.cachedAt < CACHE_TTL) {
+      return cached.data;
+    }
   }
   return null;
 };
@@ -65,7 +69,7 @@ export const useFullAnalysis = (videoId: string | null) => {
       return fullData;
     },
     enabled: !!youtubeQuery.data,
-    staleTime: Infinity,
+    staleTime: 1000 * 60 * 5,
   });
 
   return {

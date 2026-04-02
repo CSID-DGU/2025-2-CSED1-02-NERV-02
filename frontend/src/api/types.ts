@@ -47,11 +47,22 @@ export interface FullAnalysisResponse {
 }
 
 export interface SystemConfigResponse {
-  user_id: number;              // 유저 ID 추가
-  security_level: number;       // UI의 intensity (1~5)
-  risk_threshold: number;       // 위험도 임계값
-  use_detail_ai_model: boolean; // 정밀 AI 사용 여부
-  enabled_modules: string;      // 콤마 구분 문자열 (예: "SEXUAL,AGGRESSION" 또는 "ALL")
+  user_id: number;
+  security_level: number;
+  risk_threshold: number;
+  use_detail_ai_model: boolean;
+  enabled_modules: string;
+  youtube_channel_id: string | null;
+  youtube_channel_name: string | null;
+  youtube_channel_url: string | null;
+  youtube_thumbnail_url: string | null;
+}
+
+export interface YoutubeChannelInfo {
+  channel_id: string;
+  channel_name: string;
+  channel_url: string;
+  thumbnail_url: string | null;
 }
 
 export interface SystemConfigUpdate {
@@ -72,6 +83,22 @@ export interface AppSettings {
     spam: boolean;       // SPAM
     family: boolean;     // FAMILY
   };
+}
+
+export interface FilteredKeyword {
+  word: string;
+  count: number;
+  type: string;
+}
+
+export interface TrendingKeyword {
+  word: string;
+  count: number;
+}
+
+export interface KeywordAnalysisResponse {
+  filtered_keywords: FilteredKeyword[];
+  trending_keywords: TrendingKeyword[];
 }
 
 export interface DictionaryRequest {

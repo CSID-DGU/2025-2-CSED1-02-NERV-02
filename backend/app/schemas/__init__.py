@@ -17,6 +17,11 @@ from .youtube_analysis import (
     YoutubeAnalysisResponse,
     RawComment
 )
+from .keyword_analysis import (
+    FilteredKeyword,
+    TrendingKeyword,
+    KeywordAnalysisResponse,
+)
 
 __all__ = [
     "UserCreate",
@@ -42,5 +47,8 @@ __all__ = [
     "YoutubeAnalysisRequest",
     "YoutubeAnalysisResponse",
     "VideoInfo",
-    "RawComment"
+    "RawComment",
+    "FilteredKeyword",
+    "TrendingKeyword",
+    "KeywordAnalysisResponse",
 ]
