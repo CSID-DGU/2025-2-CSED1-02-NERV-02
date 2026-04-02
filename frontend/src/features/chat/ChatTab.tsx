@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useYoutubeAnalysis } from '../../hooks/useYoutubeQuery';
+import { useFullAnalysis } from '../../hooks/useYoutubeQuery';
 import { useDictionary } from '../../hooks/useSystemConfig';
 
 const ChatTab = () => {
@@ -43,7 +43,7 @@ const ChatTab = () => {
 
   // 2. TanStack Query로 데이터 가져오기
   // [설계 일치: 백엔드 API 연동] Analysis API 및 Dictionary API 호출
-  const { data: analysisData, isLoading, isError } = useYoutubeAnalysis(videoId);
+  const { data: analysisData, isLoading, isError } = useFullAnalysis(videoId);
   const { data: dictionary } = useDictionary();
 
   // [설계 일치: 안전 모드] 데이터 로딩 실패 시 빈 배열 처리 (Fail-safe)
@@ -64,7 +64,7 @@ const ChatTab = () => {
         // 1. [동작 규칙 1] 화이트리스트 최우선 적용 (Whitelist Priority) 
         // - 로컬 화이트리스트에 있는 단어가 포함되면 무조건 통과 (서버 판단보다 우선할 수도 있음 - UI UX상)
         const isWhitelisted = localWhitelist.some(goodWord => 
-          comment.original.toLowerCase().includes(goodWord.toLowerCase())
+          comment.text.toLowerCase().includes(goodWord.toLowerCase())
         );
 
         // 2. [Step 4. Policy Manager] 서버의 정책 판단 확인 (Server Action)
@@ -74,7 +74,7 @@ const ChatTab = () => {
         // 3. [UI_REQ_004] 클라이언트 로컬 블랙리스트 확인 (Local Blacklist)
         // - 서버 응답과 무관하게 사용자가 지정한 단어는 즉시 차단
         const isLocalBlacklisted = localBlacklist.some(badWord => 
-          comment.original.toLowerCase().includes(badWord.toLowerCase())
+          comment.text.toLowerCase().includes(badWord.toLowerCase())
         );
 
         // 4. [최종 판별] 이중 필터링 로직 (Dual-Check)
@@ -107,15 +107,15 @@ const ChatTab = () => {
                       : "규정 위반으로 숨겨진 메시지입니다."}
                   </span>
                 ) : (
-                  comment.processed
+                  comment.processed_text
                 )}
               </p>
               
               {/* 태그 표시 영역 (서버 태그 + 로컬 차단 태그) */}
-              {(comment.violation_tags.length > 0 || isLocalBlacklisted) && (
+              {(comment.detected_words.length > 0 || isLocalBlacklisted) && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {/* 1. 서버에서 온 위반 태그들 */}
-                  {comment.violation_tags.map(tag => (
+                  {comment.detected_words.map(({ type: tag }) => (
                     <span key={tag} className="text-[10px] px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded font-medium">
                       {tag}
                     </span>

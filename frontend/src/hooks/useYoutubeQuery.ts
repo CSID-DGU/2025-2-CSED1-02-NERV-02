@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchAnalysis } from '../api/services';
-import type { AppSettings } from '../api/types';
+import { fetchAnalysis, fetchTextAnalysis } from '../api/services';
+import type { AppSettings, AnalyzedComment, FullAnalysisResponse } from '../api/types';
 
 // 1. 유튜브 분석 데이터 쿼리
 export const useYoutubeAnalysis = (videoId: string | null) => {
@@ -10,6 +10,69 @@ export const useYoutubeAnalysis = (videoId: string | null) => {
     enabled: !!videoId,
     staleTime: 1000 * 60,
   });
+};
+
+
+const ANALYSIS_STORAGE_KEY = 'guard-filter-analysis';
+
+const saveAnalysisToStorage = async (videoId: string, data: FullAnalysisResponse) => {
+  if (typeof chrome !== 'undefined' && chrome.storage?.session) {
+    await chrome.storage.session.set({ [ANALYSIS_STORAGE_KEY]: { videoId, data } });
+  }
+};
+
+const loadAnalysisFromStorage = async (videoId: string): Promise<FullAnalysisResponse | null> => {
+  if (typeof chrome !== 'undefined' && chrome.storage?.session) {
+    const result = await chrome.storage.session.get(ANALYSIS_STORAGE_KEY);
+    const cached = result[ANALYSIS_STORAGE_KEY] as { videoId: string; data: FullAnalysisResponse } | undefined;
+    if (cached && cached.videoId === videoId) return cached.data;
+  }
+  return null;
+};
+
+// 2. YouTube + Text 분석 통합 쿼리
+export const useFullAnalysis = (videoId: string | null) => {
+  const youtubeQuery = useYoutubeAnalysis(videoId);
+
+  const textQuery = useQuery({
+    queryKey: ['text-analysis', videoId],
+    queryFn: async () => {
+      // 1. 스토리지 캐시 확인
+      const cached = await loadAnalysisFromStorage(videoId!);
+      if (cached) return cached;
+
+      // 2. API 호출
+      const rawComments = youtubeQuery.data!.results;
+      const textResults = await fetchTextAnalysis(rawComments);
+
+      const fullData: FullAnalysisResponse = {
+        video_info: youtubeQuery.data!.video_info,
+        total_comments: youtubeQuery.data!.total_comments,
+        results: rawComments.map((raw, i) => ({
+          comment_id: raw.comment_id,
+          text: raw.text,
+          author: raw.author,
+          published_at: raw.published_at,
+          processed_text: textResults[i].processed_text,
+          action: textResults[i].action,
+          score: textResults[i].score,
+          detected_words: textResults[i].details.detected_words,
+        } satisfies AnalyzedComment)),
+      };
+
+      // 3. 스토리지에 저장
+      await saveAnalysisToStorage(videoId!, fullData);
+      return fullData;
+    },
+    enabled: !!youtubeQuery.data,
+    staleTime: Infinity,
+  });
+
+  return {
+    data: textQuery.data ?? null,
+    isLoading: youtubeQuery.isLoading || textQuery.isLoading,
+    isError: youtubeQuery.isError || textQuery.isError,
+  };
 };
 
 // 2. 설정값 관리 (Chrome Storage 연동)

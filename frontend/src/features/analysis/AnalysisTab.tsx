@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useYoutubeAnalysis } from '../../hooks/useYoutubeQuery';
+import { useFullAnalysis } from '../../hooks/useYoutubeQuery';
 
 const AnalysisTab = () => {
   // 비디오 ID 가져오는 로직
@@ -20,7 +20,7 @@ const AnalysisTab = () => {
     }
   }, []);
 
-  const { data, isLoading } = useYoutubeAnalysis(videoId);
+  const { data, isLoading } = useFullAnalysis(videoId);
 
   if (isLoading) return <div className="p-4">분석 데이터 로딩 중...</div>;
   if (!data) return <div className="p-4">데이터가 없습니다.</div>;

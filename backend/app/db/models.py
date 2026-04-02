@@ -17,7 +17,6 @@ class User(Base):
 
     # 2차 필터링 개발 방향에 따라 삭제 가능성 있음
     use_detail_ai_model: Mapped[bool] = mapped_column(Boolean, default=False)
-    basic_threshold: Mapped[float] = mapped_column(Float, default=0.9)
     enabled_modules: Mapped[str] = mapped_column(String(255), default="ALL")
 
     youtube_channel_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)

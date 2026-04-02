@@ -1,16 +1,16 @@
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Optional, Any
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from app.core.config import settings
+
+from app.core import settings
 
 logger = logging.getLogger(__name__)
 
-class YouTubeClient:
+class YoutubeAnalysisService:
     def __init__(self):
-        logger.info("[System] YouTube Client 초기화 중...")
         self.youtube = self._build_service()
-
+    
     def _build_service(self):
         """(내부 메서드) YouTube API 서비스 연결"""
         api_key = settings.YOUTUBE_API_KEY
@@ -27,7 +27,7 @@ class YouTubeClient:
             logger.error(f"YouTube 서비스 빌드 실패: {e}")
             return None
 
-    def get_video_details(self, video_id: str) -> Optional[Dict[str, Any]]:
+    def get_video_details(self, video_id: str) -> Optional[dict[str, Any]]:
         """영상 메타데이터 수집"""
         if not self.youtube:
             return None
@@ -50,6 +50,7 @@ class YouTubeClient:
             return {
                 "snippet": {
                     "title": snippet.get("title"),
+                    "channelId": snippet.get("channelId"),
                     "description": snippet.get("description"),
                     "tags": snippet.get("tags", []),
                     "categoryId": snippet.get("categoryId"),
@@ -66,7 +67,7 @@ class YouTubeClient:
             logger.error(f"Unknown Error: {e}")
             return None
 
-    def get_comments(self, video_id: str, max_pages: int = 1) -> List[Dict[str, Any]]:
+    def get_comments(self, video_id: str, max_pages: int = 1) -> list[dict[str, Any]]:
         """댓글 데이터 수집"""
         if not self.youtube:
             return []
@@ -88,8 +89,8 @@ class YouTubeClient:
                     snippet = item['snippet']['topLevelComment']['snippet']
                     comments_list.append({
                         "comment_id": item['id'],
-                        "text_original": snippet['textOriginal'],
-                        "author_display_name": snippet.get('authorDisplayName'),
+                        "text": snippet['textOriginal'],
+                        "author": snippet.get('authorDisplayName'),
                         "published_at": snippet['publishedAt'],
                     })
                 
@@ -110,3 +111,7 @@ class YouTubeClient:
         except Exception as e:
             logger.error(f"Unknown Error: {e}")
             return []
+        
+    def verify_channel(self, video_info: dict, channel_id: str) -> bool:
+        """영상이 특정 채널 소유인지 검증"""
+        return video_info["snippet"].get("channelId") == channel_id

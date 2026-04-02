@@ -16,12 +16,8 @@ class Settings(BaseSettings):
 
     DEBUG_MODE: bool = False
     VIDEO_ANALYSIS_CACHE_TTL_SECONDS: int = 3600
-
-    BASIC_AI_MODULE: List[str] = [
-        '공격적이거나 모욕적인 내용이 포함되어 있는지',
-        '사회적 통념상 용인되기 어려운 혐오 표현이 있는지'
-    ]
-
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000"]
+    
     _SPECIAL_AI_MODULE_DEFINITIONS: Dict[str, str] = {
         'MODIFIED': '자음/모음 분리(예: ㅂㅅ), 특수문자 삽입, 야민정음 등 필터링 회피 시도',
         'SEXUAL': '성적 수치심 유발, 음란한 묘사, 성희롱',
@@ -37,9 +33,6 @@ class Settings(BaseSettings):
     def SPECIAL_AI_MODULES(self) -> Dict[str, str]:
         """AI 필터링 특수 모듈 정의 (카테고리별 규칙)"""
         return self._SPECIAL_AI_MODULE_DEFINITIONS
-
-    # 기본 임계값 (SecondPassFilter에서 필요)
-    BASIC_THRESHOLD: float = 0.9
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

@@ -2,18 +2,21 @@ from fastapi import APIRouter, HTTPException, Body, Depends, Query
 import logging
 
 from app.schemas import (
-    TextAnalysisRequest, FirstPassResponse, SecondPassResponse,
+    TextAnalysisRequest, FilterResult,
     RiskResponse, PolicyRequest, PolicyResponse
 )
 from app.api.deps import (
     get_first_pass_filter, get_second_pass_filter,
-    get_risk_scorer, get_policy_manager, get_youtube_client
+    get_risk_scorer, get_policy_manager, get_youtube_analysis_service,
+    get_dictionary_repository
 )
-from app.engines.first_pass_filter import FirstPassFilter
-from app.engines.second_pass_filter import SecondPassFilter
-from app.engines.risk_scorer import RiskScorer
-from app.engines.policy_manager import PolicyManager
-from app.clients.youtube_client import YouTubeClient
+from app.repositories.dictionary import DictionaryRepository
+
+from app.services.filtering.first_pass_filter import FirstPassFilter
+from app.services.filtering.second_pass_filter import SecondPassFilter
+from app.services.filtering.risk_scorer import RiskScorer
+from app.services.filtering.policy_manager import PolicyManager
+from app.services.youtube_analysis_service import YoutubeAnalysisService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -22,15 +25,16 @@ logger = logging.getLogger(__name__)
 # [API] 개별 모듈 테스트 (Unit APIs)
 # =========================================================
 
-@router.post("/users/{user_id}/first-pass", response_model=FirstPassResponse, summary="Step 1. 1차 필터링")
+@router.post("/users/{user_id}/first-pass", response_model=FilterResult, summary="Step 1. 1차 필터링")
 async def run_first_pass(
     user_id: int,
     input_data: TextAnalysisRequest,
-    first_filter: FirstPassFilter = Depends(get_first_pass_filter)
+    first_filter: FirstPassFilter = Depends(get_first_pass_filter),
+    dict_repo: DictionaryRepository = Depends(get_dictionary_repository)
 ):
     try:
-        await first_filter.reload_engine(user_id)
-        result = first_filter.execute(input_data.text)
+        dicts = await dict_repo.load_dictionaries(user_id)
+        result = first_filter.execute(input_data.text, dicts.whitelist, dicts.blacklist, dicts.system_dict)
         return result
     except KeyError:
         raise HTTPException(status_code=404, detail=f"유저 ID {user_id}를 찾을 수 없습니다.")
@@ -38,9 +42,9 @@ async def run_first_pass(
         logger.exception("1차 필터링 중 예상치 못한 오류 발생")
         raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다.")
     
-@router.post("/second-pass", response_model=SecondPassResponse, summary="Step 2. 2차 필터링 (AI)")
+@router.post("/second-pass", response_model=FilterResult, summary="Step 2. 2차 필터링 (AI)")
 async def run_second_pass(
-    first_pass_result: FirstPassResponse = Body(
+    first_pass_result: FilterResult = Body(
         ...,
         # [입력 예시] 1차 필터 결과 모델을 그대로 사용 (욕설만 잡힌 상태)
         json_schema_extra={
@@ -67,7 +71,7 @@ async def run_second_pass(
     
 @router.post("/score", response_model=RiskResponse, summary="Step 3. 위험도 점수 계산")
 async def calculate_risk_score(
-    filter_result: SecondPassResponse = Body(
+    filter_result: FilterResult = Body(
         ...,
         # [입력 예시] 2차 필터까지 완료된 상태 (모든 적발 내역 포함)
         json_schema_extra={
@@ -134,12 +138,12 @@ async def decide_policy(
 @router.get("/videos/{video_id}", summary="[DEBUG] 유튜브 영상 메타데이터 조회")
 async def get_youtube_video_info(
     video_id: str,
-    yt_client: YouTubeClient = Depends(get_youtube_client)
+    youtube_service: YoutubeAnalysisService = Depends(get_youtube_analysis_service)
 ):
-    if not yt_client.youtube:
+    if not youtube_service.youtube:
         raise HTTPException(status_code=503, detail="YouTube API 연결 실패 (API Key 확인 필요)")
 
-    video_info = yt_client.get_video_details(video_id)
+    video_info = youtube_service.get_video_details(video_id)
     if not video_info:
         raise HTTPException(status_code=404, detail=f"비디오 ID {video_id}를 찾을 수 없습니다.")
 
@@ -149,10 +153,10 @@ async def get_youtube_video_info(
 async def get_youtube_comments_raw(
     video_id: str, 
     max_pages: int = Query(1, description="수집할 페이지 수"),
-    yt_client: YouTubeClient = Depends(get_youtube_client)
+    youtube_service: YoutubeAnalysisService = Depends(get_youtube_analysis_service)
 ):
-    if not yt_client.youtube:
+    if not youtube_service.youtube:
         raise HTTPException(status_code=503, detail="YouTube API 연결 실패 (API Key 확인 필요)")
 
-    comments = yt_client.get_comments(video_id, max_pages=max_pages)
+    comments = youtube_service.get_comments(video_id, max_pages=max_pages)
     return {"video_id": video_id, "total_count": len(comments), "comments": comments}

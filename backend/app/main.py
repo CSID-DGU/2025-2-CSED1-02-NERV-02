@@ -1,19 +1,31 @@
 from contextlib import asynccontextmanager
+from app.core import settings
 from app.core.logging import setup_logging
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
-from app.engines.first_pass_filter import FirstPassFilter
+from app.services.filtering.first_pass_filter import FirstPassFilter
+from app.services.filtering.second_pass_filter import SecondPassFilter
+from app.services.filtering.risk_scorer import RiskScorer
+from app.services.filtering.policy_manager import PolicyManager
 
+from app.repositories.dictionary import load_system_dict
 from app.api.v1.api import api_router
-from app.db import Base, engine
-from app.db import models as _models
+from app.db import Base, engine, AsyncSessionLocal
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    async with AsyncSessionLocal() as session:
+        app.state.system_dict = await load_system_dict(session)
+
     app.state.first_pass_filter = FirstPassFilter()
+    app.state.second_pass_filter = SecondPassFilter()
+    app.state.risk_scorer = RiskScorer()
+    app.state.policy_manager = PolicyManager()
+    
     yield
 
 setup_logging()
@@ -28,10 +40,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(api_router, prefix="/api")

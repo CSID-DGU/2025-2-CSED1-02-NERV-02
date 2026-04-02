@@ -11,6 +11,12 @@ class UserRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
+    async def update_settings(self, user: User, data: dict) -> None:
+        for field, value in data.items():
+            if value is not None and hasattr(user, field):
+                setattr(user, field, value)
+        await self.session.commit()
+
     async def get_user_settings(self, user_id: int) -> User | None:
         try:
             stmt = select(User).where(User.id == user_id)
@@ -51,7 +57,7 @@ class UserRepository:
     async def create_user_with_password(self, username: str, password: str) -> User | None:
         """비밀번호 해싱 후 사용자 생성"""
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             hashed_password = await loop.run_in_executor(None, get_password_hash, password)
             new_user = User(
                 username=username,
@@ -75,7 +81,7 @@ class UserRepository:
             logger.warning(f"[UserRepository] 인증 실패: 존재하지 않는 사용자 '{username}'")
             return None
         
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         is_valid = await loop.run_in_executor(None, verify_password, password, user.password_hash)
         if not is_valid:
             logger.warning(f"[UserRepository] 인증 실패: 비밀번호 불일치 '{username}'")

@@ -1,2 +1,3 @@
 from .dictionary_service import DictionaryService
-from .comment_filtering_service import CommentFilteringService
+from .filtering.service import TextAnalysisService
+from .youtube_analysis_service import YoutubeAnalysisService

@@ -1,11 +1,6 @@
 from typing import List, Dict
 from pydantic import BaseModel, Field
-from enum import Enum
-
-class ListType(str, Enum):
-    """사전 타입 (whitelist/blacklist)"""
-    whitelist = "whitelist"
-    blacklist = "blacklist"
+from app.schemas.enums import ListType
 
 class DictionaryWordsRequest(BaseModel):
     """사전에 단어 추가/삭제 요청"""

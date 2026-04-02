@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { YoutubeAnalysisResponse, SystemConfigResponse, SystemConfigUpdate, DictionaryResponse, DictionaryUpdateResponse } from './types';
+import type { YoutubeAnalysisResponse, TextAnalysisResponse, RawComment, SystemConfigResponse, SystemConfigUpdate, DictionaryResponse, DictionaryUpdateResponse } from './types';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -53,23 +53,20 @@ export const getCurrentUser = async (): Promise<{ user_id: number; username: str
 
 // --- API FUNCTIONS ---
 
-// 1. 유튜브 영상 댓글 분석
+// 1. 유튜브 영상 댓글 수집
 export const fetchAnalysis = async (videoId: string, maxPages: number = 1): Promise<YoutubeAnalysisResponse> => {
-  // 로컬 개발 환경이거나 videoId가 테스트용이면 Mock 데이터 반환
-  // if (!import.meta.env.PROD || videoId === 'test_video_id') {
-  //   console.log(`[Mock API] Fetching analysis for ${videoId}`);
-  //   await new Promise((resolve) => setTimeout(resolve, 800)); // 0.8초 딜레이 시뮬레이션
-  //   return MOCK_ANALYSIS_DATA;
-  // }
-
-  // 실제 API 호출
-  const response = await client.post(`/api/analyses/youtube`, {
-    video_id: videoId,
-    max_pages: maxPages
+  const response = await client.get(`/api/analyses/youtube`, {
+    params: { video_id: videoId, max_pages: maxPages }
   });
   return response.data;
 };
 
+
+// 1-2. 댓글 필터링 분석
+export const fetchTextAnalysis = async (comments: RawComment[]): Promise<TextAnalysisResponse[]> => {
+  const response = await client.post<TextAnalysisResponse[]>(`/api/analyses/text`, comments);
+  return response.data;
+};
 // 2. 시스템 설정 조회 (GET)
 export const fetchSystemConfig = async (): Promise<SystemConfigResponse> => {
   const response = await client.get<SystemConfigResponse>(`/api/users/settings`);
@@ -91,7 +88,7 @@ export const fetchDictionary = async (): Promise<DictionaryResponse> => {
 // 5. 단어 일괄 추가 (POST)
 export const addDictionaryWord = async (listType: 'whitelist' | 'blacklist', words: string[]): Promise<DictionaryUpdateResponse> => {
   const response = await client.post<DictionaryUpdateResponse>(
-    `/api/users/dictionaries/${listType}`,
+    `/api/users/dictionaries/${listType.toUpperCase()}`,
     { words }
   );
   return response.data;
@@ -100,7 +97,7 @@ export const addDictionaryWord = async (listType: 'whitelist' | 'blacklist', wor
 // 6. 단어 목록 일괄 삭제 (DELETE)
 export const deleteDictionaryWord = async (listType: 'whitelist' | 'blacklist', words: string[]): Promise<DictionaryUpdateResponse> => {
   const response = await client.delete<DictionaryUpdateResponse>(
-    `/api/users/dictionaries/${listType}`,
+    `/api/users/dictionaries/${listType.toUpperCase()}`,
     { data: { words } }
   );
   return response.data;

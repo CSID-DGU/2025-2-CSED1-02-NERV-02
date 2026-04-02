@@ -26,18 +26,37 @@ chrome.runtime.onInstalled.addListener((details) => {
 // 메시지 리스너
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'FETCH_ANALYSIS') {
-    chrome.storage.local.get('access_token').then(({ access_token }) => {
-      fetch('http://localhost:8000/api/analyses/youtube', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${access_token}`
-        },
-        body: JSON.stringify({ video_id: message.videoId })
-      })
-        .then(r => r.json())
-        .then(data => sendResponse({ ok: true, results: data.results ?? [] }))
-        .catch(e => sendResponse({ ok: false, error: String(e) }));
+    chrome.storage.local.get('access_token').then(async ({ access_token }) => {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${access_token}`
+      };
+      try {
+        const youtubeRes = await fetch(
+          `http://localhost:8000/api/analyses/youtube?video_id=${encodeURIComponent(message.videoId)}`,
+          { method: 'GET', headers }
+        );
+        if (!youtubeRes.ok) { sendResponse({ ok: false, error: `YouTube API error: ${youtubeRes.status}` }); return; }
+        const youtubeData = await youtubeRes.json();
+        const rawComments = youtubeData.results ?? [];
+
+        const textRes = await fetch('http://localhost:8000/api/analyses/text', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(rawComments)
+        });
+        if (!textRes.ok) { sendResponse({ ok: false, error: `Text API error: ${textRes.status}` }); return; }
+        const textData: Array<{ original_text: string; processed_text: string; action: string }> = await textRes.json();
+
+        const results = textData.map(r => ({
+          original: r.original_text,
+          processed: r.processed_text,
+          action: r.action,
+        }));
+        sendResponse({ ok: true, results });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
     });
     return true; // 비동기 응답을 위해 반드시 필요
   }

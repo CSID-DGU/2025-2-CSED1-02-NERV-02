@@ -11,17 +11,29 @@ function applyFilter() {
         const htmlEl = el as HTMLElement;
         if (htmlEl.dataset.filtered) return;
 
-        const original = htmlEl.textContent?.trim();
         const normalize = (s: string) => s.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+        const original = htmlEl.dataset.originalText || htmlEl.textContent?.trim();
         const match = filterResults.find(r => normalize(r.original) === normalize(original ?? ''));
         if (!match) return;
 
-        if (match.action === 'AUTO_HIDE') {
+        if (match.action === 'AUTO_HIDE' || match.action === 'PERMANENT_DELETE') {
+            htmlEl.dataset.originalText = original ?? '';
             htmlEl.textContent = '🚫 필터링된 댓글입니다.';
-        } else if (match.action === 'MANUAL_REVIEW') {
+            htmlEl.dataset.filtered = 'true';
+        } else if (match.action === 'REVIEW_HUMAN') {
+            htmlEl.dataset.originalText = original ?? '';
             htmlEl.textContent = `⚠️ ${match.processed}`;
+            htmlEl.dataset.filtered = 'true';
+        } else if (match.action === 'MASKING') {
+            htmlEl.dataset.originalText = original ?? '';
+            htmlEl.textContent = match.processed;
+            htmlEl.dataset.filtered = 'true';
+        } else {
+            if (htmlEl.dataset.originalText) {
+                htmlEl.textContent = htmlEl.dataset.originalText;
+                delete htmlEl.dataset.originalText;
+            }
         }
-        htmlEl.dataset.filtered = 'true';
     });
 }
 
@@ -51,6 +63,15 @@ function init() {
     startObserver();
     fetchFilterResults(videoId);
 }
+
+chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === 'DICTIONARY_UPDATED' && currentVideoId) {
+        document.querySelectorAll<HTMLElement>('[data-filtered]').forEach(el => {
+            delete el.dataset.filtered;
+        });
+        fetchFilterResults(currentVideoId);
+    }
+});
 
 console.log('[GuardFilter] Content Script Loaded!');
 init();

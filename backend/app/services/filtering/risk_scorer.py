@@ -1,24 +1,28 @@
 import re
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any
+from dataclasses import dataclass
+from app.schemas.enums import WordType
 
 logger = logging.getLogger(__name__)
 
+@dataclass
+class _Weights:
+    BASE_SYSTEM: float = 0.4            # 기본 점수
+    BASE_BLACKLIST: float = 0.7         # 블랙리스트 단어 포함 시 기본 점수
+
+    COUNT_BONUS: float = 0.1            # 욕설 개수당 가산점
+    COUNT_MAX: float = 0.4              # 개수 가산점 상한선
+
+    DENSITY_BONUS: float = 0.2          # 밀도(전체 길이 대비 욕설 비중) 가산점
+
+    CONSECUTIVE_BONUS: float = 0.15     # 연속된 욕설 한 쌍당 가산점
+    CONSECUTIVE_LEN_MAX: float = 0.3    # 연속성 점수 중간 상한
+    CONSECUTIVE_MAX: float = 0.4        # 연속성 점수 최종 상한선
+
 class RiskScorer:
     def __init__(self):
-        self.weights = {
-            'BASE_SYSTEM': 0.4,      # 기본 점수
-            'BASE_BLACKLIST': 0.7,   # 블랙리스트 단어 포함 시 기본 점수
-
-            'COUNT_BONUS': 0.1,     # 욕설 개수당 가산점
-            'COUNT_MAX': 0.4,       # 개수 가산점 상한선
-
-            'DENSITY_BONUS': 0.2,   # 밀도(전체 길이 대비 욕설 비중) 가산점
-
-            'CONSECUTIVE_BONUS': 0.15, # 연속된 욕설 한 쌍당 가산점
-            'CONSECUTIVE_LEN_MAX': 0.3, # 연속성 점수 중간 상한
-            'CONSECUTIVE_MAX': 0.4    # 연속성 점수 최종 상한선
-        }
+        self.weights = _Weights()
         logger.info("[System] Risk Scorer(위험도 분석기) 로드 완료")
 
     def execute(self, filter_result: Dict[str, Any]) -> float:
@@ -33,17 +37,17 @@ class RiskScorer:
             return 0.0
         
         # 2. 기본 점수 (Base Score)
-        has_blacklist = any(item['type'] == 'USER_BLACKLIST' for item in detected_words)
+        has_blacklist = any(item['type'] == WordType.USER_BLACKLIST for item in detected_words)
         if has_blacklist:
-            total_score = self.weights['BASE_BLACKLIST']
+            total_score = self.weights.BASE_BLACKLIST
         else:
-            total_score = self.weights['BASE_SYSTEM']
+            total_score = self.weights.BASE_SYSTEM
 
         # 3. 가중치 계산
         
         # (A) 개수 (Quantity)
         count = len(detected_words)
-        total_score += min((count - 1) * self.weights['COUNT_BONUS'], self.weights['COUNT_MAX'])
+        total_score += min((count - 1) * self.weights.COUNT_BONUS, self.weights.COUNT_MAX)
         
         # (B) 밀도 (Density)
         text_len = len(masked_text.replace(" ", ""))
@@ -51,7 +55,7 @@ class RiskScorer:
             detected_words_len = sum(len(item['word']) for item in detected_words)
             density = detected_words_len / text_len
             if density > 0.4:
-                total_score += self.weights['DENSITY_BONUS']
+                total_score += self.weights.DENSITY_BONUS
 
         # (C) 연속성 (Consecutive Degree)
         # "__B__" 또는 "__F__" 토큰이 2개 이상 연속으로 나오는 시퀀스 탐색
@@ -62,9 +66,9 @@ class RiskScorer:
             # 발견된 시퀀스 안에서 토큰(__F__, __B__) 수 계산
             seq_len = len(re.findall(r'__[BF]__', seq))
             if seq_len >= 2:
-                consecutive_score += min(self.weights['CONSECUTIVE_BONUS'] * (seq_len - 1), self.weights['CONSECUTIVE_LEN_MAX'])
+                consecutive_score += min(self.weights.CONSECUTIVE_BONUS * (seq_len - 1), self.weights.CONSECUTIVE_LEN_MAX)
         
-        total_score += min(consecutive_score, self.weights['CONSECUTIVE_MAX'])
+        total_score += min(consecutive_score, self.weights.CONSECUTIVE_MAX)
 
         # 4. 최종 마무리
         return min(round(total_score, 2), 1.0)

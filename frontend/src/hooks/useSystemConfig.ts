@@ -89,7 +89,6 @@ export const useSettings = () => {
       enabled_modules: 'ALL',  // 문자열로 변경
       risk_threshold: 0.65, 
       use_detail_ai_model: false,
-      basic_threshold: 0.9,  // 추가
     } as SystemConfigResponse, 
     staleTime: Infinity,
   });
@@ -144,8 +143,7 @@ export const useDictionary = () => {
         return MOCK_DICTIONARY;
       }
     },
-    initialData: MOCK_DICTIONARY,
-    staleTime: Infinity,
+    staleTime: 0,
   });
 };
 
@@ -170,6 +168,11 @@ export const useAddDictionaryWord = () => {
           whitelist: isWhite ? [...current.whitelist, ...newWordReq.words] : current.whitelist,
           blacklist: !isWhite ? [...current.blacklist, ...newWordReq.words] : current.blacklist,
         };
+      });
+    },
+    onSuccess: () => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) chrome.tabs.sendMessage(tabs[0].id, { type: 'DICTIONARY_UPDATED' });
       });
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['system-dictionary'] }),
@@ -199,10 +202,15 @@ export const useDeleteDictionaryWord = () => {
           whitelist: isWhite 
             ? current.whitelist.filter((w: string) => !targetWords.includes(w)) 
             : current.whitelist,
-          blacklist: !isWhite 
-            ? current.blacklist.filter((w: string) => !targetWords.includes(w)) 
+          blacklist: !isWhite
+            ? current.blacklist.filter((w: string) => !targetWords.includes(w))
             : current.blacklist,
         };
+      });
+    },
+    onSuccess: () => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) chrome.tabs.sendMessage(tabs[0].id, { type: 'DICTIONARY_UPDATED' });
       });
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['system-dictionary'] }),
