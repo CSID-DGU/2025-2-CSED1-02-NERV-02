@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { YoutubeAnalysisResponse, TextAnalysisResponse, RawComment, SystemConfigResponse, SystemConfigUpdate, DictionaryResponse, DictionaryUpdateResponse, KeywordAnalysisResponse, YoutubeChannelInfo } from './types';
+import type { YoutubeAnalysisResponse, TextAnalysisResponse, RawComment, SystemConfigResponse, SystemConfigUpdate, DictionaryResponse, DictionaryUpdateResponse, KeywordAnalysisResponse, YoutubeChannelInfo, FilterDictionaryResponse } from './types';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -118,4 +118,10 @@ export const linkYoutubeChannel = async (channelId: string): Promise<YoutubeChan
 // 9. YouTube 채널 연동 해제
 export const unlinkYoutubeChannel = async (): Promise<void> => {
   await client.delete('/api/users/youtube-channel');
+};
+
+// 10. 클라이언트 필터링용 정규화 사전 조회
+export const fetchFilterDictionary = async (): Promise<FilterDictionaryResponse> => {
+  const response = await client.get<FilterDictionaryResponse>('/api/users/filter-dictionary');
+  return response.data;
 };

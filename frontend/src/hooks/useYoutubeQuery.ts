@@ -2,20 +2,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchAnalysis, fetchTextAnalysis } from '../api/services';
 import type { AppSettings, AnalyzedComment, FullAnalysisResponse } from '../api/types';
 
-// 1. 유튜브 분석 데이터 쿼리
-export const useYoutubeAnalysis = (videoId: string | null) => {
-  return useQuery({
-    queryKey: ['youtube-analysis', videoId],
-    queryFn: () => fetchAnalysis(videoId!),
-    enabled: !!videoId,
-    staleTime: 1000 * 60,
-  });
-};
-
-
 const ANALYSIS_STORAGE_KEY = 'guard-filter-analysis';
+const FILTER_RESULT_KEY = 'guard-filter-results';
 
 const CACHE_TTL = 5 * 60 * 1000; // 5분
+
+// ── 텍스트 정규화 (API textOriginal ↔ DOM textContent 차이 대응) ──
+// 공백, 줄바꿈, 특수 유니코드 공백을 모두 제거하고 소문자화
+function normalizeForMatch(text: string): string {
+  return text.replace(/[\s\u200B-\u200D\uFEFF]/g, '').toLowerCase();
+}
+
+// ── 팝업 분석 캐시 (chrome.storage.session — 팝업 전용) ──
 
 const saveAnalysisToStorage = async (videoId: string, data: FullAnalysisResponse) => {
   if (typeof chrome !== 'undefined' && chrome.storage?.session) {
@@ -34,24 +32,53 @@ const loadAnalysisFromStorage = async (videoId: string): Promise<FullAnalysisRes
   return null;
 };
 
-// 2. YouTube + Text 분석 통합 쿼리
+// ── 필터링 결과를 chrome.storage.local에 저장 (content-script 접근 가능) ──
+
+const syncFilterResultsToContentScript = async (videoId: string, data: FullAnalysisResponse) => {
+  const filteredTexts = data.results
+    .filter(c => c.action !== 'PASS')
+    .map(c => normalizeForMatch(c.text));
+
+  // 1. chrome.storage.local에 저장 (content-script가 언제든 읽을 수 있음)
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    await chrome.storage.local.set({
+      [FILTER_RESULT_KEY]: { videoId, texts: filteredTexts },
+    });
+  }
+
+  // 2. content-script에 알림 (즉시 반영)
+  if (typeof chrome !== 'undefined' && chrome.tabs) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: 'FILTER_RESULTS_UPDATED' });
+      }
+    });
+  }
+};
+
+// ── YouTube + Text 분석 통합 쿼리 ──
+
 export const useFullAnalysis = (videoId: string | null) => {
-  const youtubeQuery = useYoutubeAnalysis(videoId);
-
-  const textQuery = useQuery({
-    queryKey: ['text-analysis', videoId],
+  const query = useQuery({
+    queryKey: ['full-analysis', videoId],
     queryFn: async () => {
-      // 1. 스토리지 캐시 확인
+      // 1. chrome.storage.session 캐시 확인
       const cached = await loadAnalysisFromStorage(videoId!);
-      if (cached) return cached;
+      if (cached) {
+        await syncFilterResultsToContentScript(videoId!, cached);
+        return cached;
+      }
 
-      // 2. API 호출
-      const rawComments = youtubeQuery.data!.results;
+      // 2. 캐시 없음 → YouTube 댓글 수집
+      const youtubeData = await fetchAnalysis(videoId!);
+
+      // 3. 텍스트 분석 API 호출
+      const rawComments = youtubeData.results;
       const textResults = await fetchTextAnalysis(rawComments);
 
       const fullData: FullAnalysisResponse = {
-        video_info: youtubeQuery.data!.video_info,
-        total_comments: youtubeQuery.data!.total_comments,
+        video_info: youtubeData.video_info,
+        total_comments: youtubeData.total_comments,
         results: rawComments.map((raw, i) => ({
           comment_id: raw.comment_id,
           text: raw.text,
@@ -64,48 +91,48 @@ export const useFullAnalysis = (videoId: string | null) => {
         } satisfies AnalyzedComment)),
       };
 
-      // 3. 스토리지에 저장
+      // 4. 저장 + content-script 동기화
       await saveAnalysisToStorage(videoId!, fullData);
+      await syncFilterResultsToContentScript(videoId!, fullData);
       return fullData;
     },
-    enabled: !!youtubeQuery.data,
+    enabled: !!videoId,
     staleTime: 1000 * 60 * 5,
   });
 
   return {
-    data: textQuery.data ?? null,
-    isLoading: youtubeQuery.isLoading || textQuery.isLoading,
-    isError: youtubeQuery.isError || textQuery.isError,
+    data: query.data ?? null,
+    isLoading: query.isLoading,
+    isError: query.isError,
   };
 };
 
-// 2. 설정값 관리 (Chrome Storage 연동)
-// API 서버에 설정 저장 기능이 없으므로, 로컬 스토리지(확장프로그램 스토리지)를 사용합니다.
+// ── 설정값 관리 ──
+
 const STORAGE_KEY = 'guard-filter-settings';
 
 const defaultSettings: AppSettings = {
   intensity: 3,
-  modules: {  modified: false,
+  modules: {
+    modified: false,
     sexual: false,
     privacy: false,
     aggression: false,
     political: false,
     spam: false,
-    family: false, },
+    family: false,
+  },
 };
 
-// 설정을 불러오는 가짜 비동기 함수
 const getSettingsFromStorage = async (): Promise<AppSettings> => {
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
     const result = await chrome.storage.local.get(STORAGE_KEY);
     return (result[STORAGE_KEY] as AppSettings) || defaultSettings;
   }
-  // 로컬 개발 환경 (localStorage 사용)
   const stored = localStorage.getItem(STORAGE_KEY);
   return stored ? JSON.parse(stored) : defaultSettings;
 };
 
-// 설정을 저장하는 가짜 비동기 함수
 const saveSettingsToStorage = async (newSettings: AppSettings) => {
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
     await chrome.storage.local.set({ [STORAGE_KEY]: newSettings });
@@ -115,7 +142,6 @@ const saveSettingsToStorage = async (newSettings: AppSettings) => {
   return newSettings;
 };
 
-// [Hook] 설정 불러오기
 export const useSettings = () => {
   return useQuery({
     queryKey: ['app-settings'],
@@ -124,7 +150,6 @@ export const useSettings = () => {
   });
 };
 
-// [Hook] 설정 업데이트하기 (Mutation)
 export const useUpdateSettings = () => {
   const queryClient = useQueryClient();
 

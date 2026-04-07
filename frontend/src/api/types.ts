@@ -101,6 +101,12 @@ export interface KeywordAnalysisResponse {
   trending_keywords: TrendingKeyword[];
 }
 
+export interface FilterDictionaryResponse {
+  patterns: Record<string, { original: string; type: string }>;
+  whitelist: string[];
+  version: string;
+}
+
 export interface DictionaryRequest {
   words: string[];
   list_type: 'whitelist' | 'blacklist';

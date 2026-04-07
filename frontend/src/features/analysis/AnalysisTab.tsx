@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useFullAnalysis, useYoutubeAnalysis } from '../../hooks/useYoutubeQuery';
-import { useAddDictionaryWord, useYoutubeChannel, useLinkYoutubeChannel, useUnlinkYoutubeChannel } from '../../hooks/useSystemConfig';
+import { useFullAnalysis } from '../../hooks/useYoutubeQuery';
+import { useAddDictionaryWord, useDeleteDictionaryWord, useYoutubeChannel, useLinkYoutubeChannel, useUnlinkYoutubeChannel } from '../../hooks/useSystemConfig';
 import { fetchKeywordAnalysis } from '../../api/services';
-import type { KeywordAnalysisResponse } from '../../api/types';
+import type { KeywordAnalysisResponse, FilteredKeyword, TrendingKeyword } from '../../api/types';
 
 const AnalysisTab = () => {
   const [videoId, setVideoId] = useState<string | null>(null);
   const [channelInput, setChannelInput] = useState('');
+
+  // 허용/차단 버튼으로 이동된 키워드를 로컬에서 즉시 반영
+  const [allowedWords, setAllowedWords] = useState<Set<string>>(new Set());
+  const [blockedWords, setBlockedWords] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query) {
@@ -29,18 +33,57 @@ const AnalysisTab = () => {
   const unlinkChannel = useUnlinkYoutubeChannel();
 
   const { data, isLoading } = useFullAnalysis(videoId);
-  const youtubeQuery = useYoutubeAnalysis(videoId);
   const addWord = useAddDictionaryWord();
+  const deleteWord = useDeleteDictionaryWord();
 
   const keywordQuery = useQuery({
     queryKey: ['keyword-analysis', videoId],
-    queryFn: () => fetchKeywordAnalysis(youtubeQuery.data!.results),
-    enabled: !!youtubeQuery.data,
+    queryFn: () => fetchKeywordAnalysis(
+      data!.results.map(r => ({ comment_id: r.comment_id, text: r.text, author: r.author, published_at: r.published_at }))
+    ),
+    enabled: !!data,
     staleTime: 1000 * 60 * 5,
   });
 
   const keywords: KeywordAnalysisResponse | null = keywordQuery.data ?? null;
   const isLinked = !!channel?.channel_id;
+
+  // 서버 키워드 데이터가 갱신되면 로컬 오버라이드 초기화
+  useEffect(() => {
+    if (keywordQuery.dataUpdatedAt > 0) {
+      setAllowedWords(new Set());
+      setBlockedWords(new Set());
+    }
+  }, [keywordQuery.dataUpdatedAt]);
+
+  // 서버 데이터에 로컬 상태 적용한 최종 키워드 목록
+  const filteredKeywords: FilteredKeyword[] = keywords
+    ? [
+        // 서버 필터링 키워드에서 허용된 것 제거
+        ...keywords.filtered_keywords.filter(kw => !allowedWords.has(kw.word)),
+        // 차단으로 이동된 트렌딩 키워드 추가
+        ...[...blockedWords]
+          .map(word => {
+            const trending = keywords.trending_keywords.find(kw => kw.word === word);
+            return trending ? { word: trending.word, count: trending.count, type: 'USER_BLACKLIST' } : null;
+          })
+          .filter((kw): kw is FilteredKeyword => kw !== null),
+      ]
+    : [];
+
+  const trendingKeywords: TrendingKeyword[] = keywords
+    ? [
+        // 서버 트렌딩에서 차단된 것 제거
+        ...keywords.trending_keywords.filter(kw => !blockedWords.has(kw.word)),
+        // 허용으로 이동된 필터링 키워드 추가 (자주 등장하는 키워드에 표시)
+        ...[...allowedWords]
+          .map(word => {
+            const filtered = keywords.filtered_keywords.find(kw => kw.word === word);
+            return filtered ? { word: filtered.word, count: filtered.count } : null;
+          })
+          .filter((kw): kw is TrendingKeyword => kw !== null),
+      ]
+    : [];
 
   const handleLink = () => {
     const id = channelInput.trim();
@@ -50,11 +93,18 @@ const AnalysisTab = () => {
     });
   };
 
-  const handleAddToWhitelist = (word: string) => {
-    addWord.mutate({ words: [word], list_type: 'whitelist' });
+  const handleAllow = (word: string, type: string) => {
+    setAllowedWords(prev => new Set(prev).add(word));
+
+    if (type === 'USER_BLACKLIST') {
+      deleteWord.mutate({ words: [word], list_type: 'blacklist' });
+    } else {
+      addWord.mutate({ words: [word], list_type: 'whitelist' });
+    }
   };
 
-  const handleAddToBlacklist = (word: string) => {
+  const handleBlock = (word: string) => {
+    setBlockedWords(prev => new Set(prev).add(word));
     addWord.mutate({ words: [word], list_type: 'blacklist' });
   };
 
@@ -164,11 +214,11 @@ const AnalysisTab = () => {
             </div>
 
             {/* 필터링된 키워드 */}
-            {keywords && keywords.filtered_keywords.length > 0 && (
+            {filteredKeywords.length > 0 && (
               <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm mb-4">
                 <h3 className="font-bold text-sm mb-3">필터링된 키워드</h3>
                 <div className="space-y-2">
-                  {keywords.filtered_keywords.map((kw) => (
+                  {filteredKeywords.map((kw) => (
                     <div key={kw.word} className="flex items-center justify-between bg-red-50 px-3 py-2 rounded">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-red-700">{kw.word}</span>
@@ -176,7 +226,7 @@ const AnalysisTab = () => {
                         <span className="text-xs text-gray-400">{kw.type === 'SYSTEM_KEYWORD' ? '시스템' : '블랙리스트'}</span>
                       </div>
                       <button
-                        onClick={() => handleAddToWhitelist(kw.word)}
+                        onClick={() => handleAllow(kw.word, kw.type)}
                         className="text-xs bg-white border border-green-300 text-green-600 px-2 py-1 rounded hover:bg-green-50"
                       >
                         허용
@@ -188,18 +238,18 @@ const AnalysisTab = () => {
             )}
 
             {/* 자주 등장하는 키워드 */}
-            {keywords && keywords.trending_keywords.length > 0 && (
+            {trendingKeywords.length > 0 && (
               <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm mb-4">
                 <h3 className="font-bold text-sm mb-3">자주 등장하는 키워드</h3>
                 <div className="space-y-2">
-                  {keywords.trending_keywords.map((kw) => (
+                  {trendingKeywords.map((kw) => (
                     <div key={kw.word} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gray-700">{kw.word}</span>
                         <span className="text-xs text-gray-400">{kw.count}회</span>
                       </div>
                       <button
-                        onClick={() => handleAddToBlacklist(kw.word)}
+                        onClick={() => handleBlock(kw.word)}
                         className="text-xs bg-white border border-red-300 text-red-600 px-2 py-1 rounded hover:bg-red-50"
                       >
                         차단

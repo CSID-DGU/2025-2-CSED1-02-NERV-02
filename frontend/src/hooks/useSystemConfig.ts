@@ -183,7 +183,7 @@ export const useDictionary = () => {
         return MOCK_DICTIONARY;
       }
     },
-    staleTime: 0,
+    staleTime: 1000 * 60 * 5,
   });
 };
 
@@ -210,15 +210,13 @@ export const useAddDictionaryWord = () => {
         };
       });
     },
-    onSuccess: () => {
-      // 분석 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ['text-analysis'] });
+    onSuccess: async () => {
       if (typeof chrome !== 'undefined' && chrome.storage?.session) {
-        chrome.storage.session.remove('guard-filter-analysis');
+        await chrome.storage.session.remove('guard-filter-analysis');
       }
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) chrome.tabs.sendMessage(tabs[0].id, { type: 'DICTIONARY_UPDATED' });
-      });
+      // refetchType: 'all' → 어떤 탭이든 비활성 쿼리도 refetch (FilterTab에서도 재분석 트리거)
+      queryClient.invalidateQueries({ queryKey: ['full-analysis'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['keyword-analysis'], refetchType: 'all' });
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['system-dictionary'] }),
   });
@@ -253,15 +251,12 @@ export const useDeleteDictionaryWord = () => {
         };
       });
     },
-    onSuccess: () => {
-      // 분석 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ['text-analysis'] });
+    onSuccess: async () => {
       if (typeof chrome !== 'undefined' && chrome.storage?.session) {
-        chrome.storage.session.remove('guard-filter-analysis');
+        await chrome.storage.session.remove('guard-filter-analysis');
       }
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) chrome.tabs.sendMessage(tabs[0].id, { type: 'DICTIONARY_UPDATED' });
-      });
+      queryClient.invalidateQueries({ queryKey: ['full-analysis'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['keyword-analysis'], refetchType: 'all' });
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['system-dictionary'] }),
   });

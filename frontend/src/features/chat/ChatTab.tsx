@@ -78,46 +78,61 @@ const ChatTab = () => {
         );
 
         // 4. [최종 판별] 이중 필터링 로직 (Dual-Check)
-        // - 화이트리스트가 아니면서, (서버가 숨기라고 했거나 OR 로컬 블랙리스트에 걸렸거나)
         const shouldBlur = !isWhitelisted && (isServerFiltered || isLocalBlacklisted);
+
+        // 5. [검토 필요] 키워드 감지됐지만 임계값 미달 (action=PASS && detected_words 존재)
+        const needsReview = !shouldBlur && !isWhitelisted && comment.detected_words.length > 0 && comment.action === 'PASS';
 
         // =================================================================================
 
+        const bgClass = shouldBlur ? 'bg-red-50' : needsReview ? 'bg-yellow-50' : 'hover:bg-gray-50';
+        const avatarClass = shouldBlur ? 'bg-red-300' : needsReview ? 'bg-yellow-400' : 'bg-indigo-400';
+
         return (
-          <div key={index} className={`flex items-start space-x-3 p-2 rounded-lg transition-colors ${shouldBlur ? 'bg-red-50' : 'hover:bg-gray-50'}`}>
+          <div key={index} className={`flex items-start space-x-3 p-2 rounded-lg transition-colors ${bgClass}`}>
             {/* 아바타 */}
-            <div className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-white font-bold text-xs ${shouldBlur ? 'bg-red-300' : 'bg-indigo-400'}`}>
+            <div className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-white font-bold text-xs ${avatarClass}`}>
               {comment.author.substring(1, 3).toUpperCase()}
             </div>
-            
+
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline space-x-2">
                 <span className="font-bold text-sm text-gray-800 truncate">{comment.author}</span>
                 <span className="text-xs text-gray-400">{comment.published_at}</span>
               </div>
-              
+
              {/* 본문 (조건부 렌더링) */}
-              <p className={`text-sm mt-1 leading-relaxed break-words ${shouldBlur ? 'text-red-500 italic text-xs' : 'text-gray-700'}`}>
+              <p className={`text-sm mt-1 leading-relaxed break-words ${
+                shouldBlur ? 'text-red-500 italic text-xs' :
+                needsReview ? 'text-yellow-700' : 'text-gray-700'
+              }`}>
                 {shouldBlur ? (
                   <span className="flex items-center">
-                     {/* 아이콘 추가로 시각적 인지 강화 */}
                     <span className="mr-1">🚫</span>
-                    {isLocalBlacklisted 
-                      ? "사용자 블랙리스트 단어가 포함되어 숨겨졌습니다." 
+                    {isLocalBlacklisted
+                      ? "사용자 블랙리스트 단어가 포함되어 숨겨졌습니다."
                       : "규정 위반으로 숨겨진 메시지입니다."}
                   </span>
                 ) : (
                   comment.processed_text
                 )}
               </p>
-              
-              {/* 태그 표시 영역 (서버 태그 + 로컬 차단 태그) */}
+
+              {/* 검토 필요 안내 */}
+              {needsReview && (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-[10px] px-1.5 py-0.5 bg-yellow-200 text-yellow-800 rounded font-medium">
+                    ⚠️ 사용자 검토가 필요합니다
+                  </span>
+                </div>
+              )}
+
+              {/* 태그 표시 영역 */}
               {(comment.detected_words.length > 0 || isLocalBlacklisted) && (
                 <div className="flex flex-wrap gap-1 mt-2">
-                  {/* 1. 서버에서 온 위반 태그들 */}
-                  {comment.detected_words.map(({ type: tag }) => (
-                    <span key={tag} className="text-[10px] px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded font-medium">
-                      {tag}
+                  {comment.detected_words.map(({ word, type: tag }) => (
+                    <span key={`${word}-${tag}`} className="text-[10px] px-1.5 py-0.5 bg-gray-200 text-gray-600 rounded font-medium">
+                      {word} ({tag === 'SYSTEM_KEYWORD' ? '시스템' : '블랙리스트'})
                     </span>
                   ))}
                 </div>

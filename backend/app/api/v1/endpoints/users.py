@@ -7,11 +7,14 @@ from app.schemas import (
     UserSettingsResponse, UserSettingsUpdate
 )
 
-from app.api.deps import get_dictionary_service, get_user_service, get_current_user, get_youtube_analysis_service
+from app.api.deps import get_dictionary_service, get_user_service, get_current_user, get_youtube_analysis_service, get_dictionary_repository
 
 from app.services.dictionary_service import DictionaryService
 from app.services.user_service import UserService
 from app.services.youtube_analysis_service import YoutubeAnalysisService
+from app.repositories.dictionary import DictionaryRepository
+from app.services.filtering.variant_generator import build_normalized_dictionary
+import hashlib
 
 router = APIRouter()
 
@@ -50,13 +53,14 @@ async def add_dictionary_words(
     사용자 사전(whitelist 또는 blacklist)에 단어를 일괄 추가합니다.
     """
     
+    user_id = user.id
     added_count = await dict_service.add_user_words(
-        user_id=user.id,
+        user_id=user_id,
         words=req.words,
         list_type=list_type
     )
-    
-    data = await dict_service.get_user_dictionaries(user.id)
+
+    data = await dict_service.get_user_dictionaries(user_id)
 
     return DictionaryUpdateResponse(
         status="success",
@@ -79,13 +83,14 @@ async def remove_dictionary_words(
     사용자 사전에서 단어를 일괄 삭제합니다.
     """
     
+    user_id = user.id
     removed_count = await dict_service.remove_user_words(
-        user_id=user.id,
+        user_id=user_id,
         words=req.words,
         list_type=list_type
     )
 
-    data = await dict_service.get_user_dictionaries(user.id)
+    data = await dict_service.get_user_dictionaries(user_id)
 
     return DictionaryUpdateResponse(
         status="success",
@@ -97,14 +102,30 @@ async def remove_dictionary_words(
         }
     )
 
+@router.get("/filter-dictionary", summary="클라이언트 필터링용 정규화 사전")
+async def get_filter_dictionary(
+    user: User = Depends(get_current_user),
+    dict_repo: DictionaryRepository = Depends(get_dictionary_repository),
+):
+    """변형 포함 정규화 사전을 반환합니다. 클라이언트가 로컬 필터링에 사용."""
+    dicts = await dict_repo.load_dictionaries(user.id)
+    result = build_normalized_dictionary(dicts.system_dict, dicts.blacklist, dicts.whitelist)
+
+    raw = "|".join(sorted(dicts.whitelist) + sorted(dicts.blacklist) + sorted(dicts.system_dict))
+    result["version"] = hashlib.md5(raw.encode()).hexdigest()
+
+    return result
+
+
 @router.get("/settings", response_model=UserSettingsResponse, summary="유저 개인 설정 조회")
 async def get_user_settings(
     user: User = Depends(get_current_user),
     user_service: UserService = Depends(get_user_service)
 ):
     """사용자 필터링 설정을 조회합니다."""
-    user = await user_service.get_settings(user.id)
-    
+    user_id = user.id
+    user = await user_service.get_settings(user_id)
+
     return {
         "user_id": user.id,
         "security_level": user.security_level,
@@ -124,7 +145,8 @@ async def update_user_settings(
     user_service: UserService = Depends(get_user_service)
 ):
     """사용자 필터링 설정을 부분 업데이트합니다 (PATCH)."""
-    user = await user_service.update_settings(user.id, req.model_dump(exclude_unset=True))
+    user_id = user.id
+    user = await user_service.update_settings(user_id, req.model_dump(exclude_unset=True))
 
     return {
         "user_id": user.id,
@@ -147,11 +169,12 @@ async def link_youtube_channel(
     youtube_service: YoutubeAnalysisService = Depends(get_youtube_analysis_service),
 ):
     """YouTube 채널 ID를 검증하고 사용자 계정에 연동합니다."""
+    user_id = user.id
     channel_info = youtube_service.get_channel_info(channel_id)
     if not channel_info:
         raise HTTPException(status_code=404, detail="유효하지 않은 채널 ID입니다.")
 
-    await user_service.update_settings(user.id, {
+    await user_service.update_settings(user_id, {
         "youtube_channel_id": channel_info["channel_id"],
         "youtube_channel_name": channel_info["channel_name"],
         "youtube_channel_url": channel_info["channel_url"],
@@ -167,7 +190,8 @@ async def unlink_youtube_channel(
     user_service: UserService = Depends(get_user_service),
 ):
     """사용자 계정에서 YouTube 채널 연동을 해제합니다."""
-    await user_service.update_settings(user.id, {
+    user_id = user.id
+    await user_service.update_settings(user_id, {
         "youtube_channel_id": None,
         "youtube_channel_name": None,
         "youtube_channel_url": None,

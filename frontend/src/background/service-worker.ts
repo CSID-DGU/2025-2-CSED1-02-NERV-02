@@ -61,6 +61,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'FETCH_DICTIONARY') {
+    chrome.storage.local.get('access_token').then(async ({ access_token }) => {
+      try {
+        const res = await fetch('http://localhost:8000/api/users/filter-dictionary', {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${access_token}`
+          }
+        });
+        if (!res.ok) { sendResponse({ ok: false, error: `Dictionary API error: ${res.status}` }); return; }
+        const data = await res.json();
+        sendResponse({ ok: true, data });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    });
+    return true;
+  }
+
   if (message.type === 'ANALYZE_TEXTS') {
     chrome.storage.local.get('access_token').then(async ({ access_token }) => {
       const headers = {
