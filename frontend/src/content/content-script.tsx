@@ -1,34 +1,73 @@
 // ── 상수 ──
 const FILTER_RESULT_KEY = 'guard-filter-results';
 
-const COMMENT_SELECTORS = [
-  'ytd-comment-view-model #content-text',
-  'ytd-comment-renderer #content-text',
-];
-const COMBINED_SELECTOR = COMMENT_SELECTORS.join(', ');
+// comment-id 속성을 가진 YouTube 댓글 컨테이너.
+// ytd-comment-view-model 은 최신 YouTube 댓글 구조, ytd-comment-renderer 는 구버전.
+const COMMENT_CONTAINER_SELECTOR = 'ytd-comment-view-model, ytd-comment-renderer';
+const CONTENT_TEXT_SELECTOR = '#content-text';
+
+// ── 타입 ──
+type FilterAction = 'FULL_BLOCK' | 'PARTIAL_MASK';
+
+interface FilterEntry {
+  id: string;
+  textNorm: string;
+  action: FilterAction;
+  maskedText: string;
+}
 
 // ── 상태 ──
-let filteredTexts: string[] = [];  // 정규화된 필터링 대상 텍스트 배열
+let entriesById: Map<string, FilterEntry> = new Map();
+let entriesByText: Map<string, FilterEntry> = new Map();
 let currentVideoId: string | null = null;
 let observer: MutationObserver | null = null;
 let applyTimeout: ReturnType<typeof setTimeout> | null = null;
 
-// ── 텍스트 정규화 (모든 비-문자를 제거하여 최대한 유연하게 매칭) ──
-function normalizeForMatch(text: string): string {
-  // 공백, 줄바꿈, 특수문자 차이를 모두 무시하고 순수 텍스트만 비교
-  return text.replace(/[\s\u200B-\u200D\uFEFF]/g, '').toLowerCase();
+// ── 텍스트 정규화 ──
+// NFKC + 소문자 + 공백/zero-width/변이선택자/구두점/기호(이모지 포함) 제거.
+// YouTube API textOriginal 과 DOM textContent 사이의 렌더링 차이를 최대한 흡수한다.
+function ultraNormalize(text: string): string {
+  return text
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\s\u200B-\u200D\uFEFF\u00A0\uFE00-\uFE0F]/g, '')
+    .replace(/[\p{P}\p{S}]/gu, '');
+}
+
+// ── 댓글 컨테이너에서 comment_id 추출 ──
+// 1. <ytd-comment-view-model comment-id="..."> (최신 YouTube)
+// 2. 타임스탬프 앵커의 ?lc= 파라미터 (구버전/fallback)
+function extractCommentId(container: Element): string | null {
+  const directId = container.getAttribute('comment-id');
+  if (directId) return directId;
+
+  const link = container.querySelector<HTMLAnchorElement>('a[href*="lc="]');
+  if (link?.href) {
+    try {
+      const url = new URL(link.href, window.location.origin);
+      const lc = url.searchParams.get('lc');
+      if (lc) return lc;
+    } catch {
+      // 파싱 실패 시 무시
+    }
+  }
+  return null;
 }
 
 // ── 필터링 결과 로드 ──
 async function loadFilterResults(): Promise<boolean> {
   try {
     const result = await chrome.storage.local.get(FILTER_RESULT_KEY);
-    const data = result[FILTER_RESULT_KEY] as { videoId: string; texts: string[] } | undefined;
+    const data = result[FILTER_RESULT_KEY] as
+      | { videoId: string; entries?: FilterEntry[] }
+      | undefined;
 
-    if (data && data.videoId === currentVideoId && data.texts?.length > 0) {
-      filteredTexts = data.texts; // 이미 정규화된 상태
-      console.log(`[GuardFilter] 필터링 대상 ${filteredTexts.length}개 로드됨`);
-      return true;
+    if (data && data.videoId === currentVideoId) {
+      const list = data.entries ?? [];
+      entriesById = new Map(list.map(e => [e.id, e]));
+      entriesByText = new Map(list.map(e => [e.textNorm, e]));
+      console.log(`[GuardFilter] 로드 완료 — ${list.length}개 엔트리`);
+      return list.length > 0;
     }
   } catch (e) {
     console.warn('[GuardFilter] 필터링 결과 로드 실패:', e);
@@ -36,44 +75,59 @@ async function loadFilterResults(): Promise<boolean> {
   return false;
 }
 
+// ── 매칭된 엔트리 찾기: id 우선, text fallback ──
+function findEntry(container: Element, textEl: HTMLElement): FilterEntry | null {
+  const commentId = extractCommentId(container);
+  if (commentId) {
+    const byId = entriesById.get(commentId);
+    if (byId) return byId;
+  }
+
+  if (entriesByText.size === 0) return null;
+
+  const originalText = textEl.textContent?.trim() || '';
+  if (!originalText) return null;
+  const normalized = ultraNormalize(originalText);
+  if (normalized.length < 2) return null;
+
+  return entriesByText.get(normalized) ?? null;
+}
+
 // ── DOM 필터링 ──
 function applyFilter() {
-  if (filteredTexts.length === 0) return;
+  if (entriesById.size === 0 && entriesByText.size === 0) return;
 
-  const elements = document.querySelectorAll(COMBINED_SELECTOR);
+  const containers = document.querySelectorAll<HTMLElement>(COMMENT_CONTAINER_SELECTOR);
   let newFiltered = 0;
 
-  elements.forEach(el => {
-    const htmlEl = el as HTMLElement;
-    if (htmlEl.dataset.guardProcessed) return;
+  containers.forEach((container) => {
+    const textEl = container.querySelector<HTMLElement>(CONTENT_TEXT_SELECTOR);
+    if (!textEl || textEl.dataset.guardProcessed) return;
 
-    const originalText = htmlEl.textContent?.trim() || '';
+    const originalText = textEl.textContent?.trim() || '';
     if (!originalText) return;
 
-    const normalized = normalizeForMatch(originalText);
-
-    // 정규화된 텍스트가 필터링 목록에 포함되는지 확인
-    const shouldFilter = filteredTexts.some(ft => normalized === ft || normalized.includes(ft) || ft.includes(normalized));
-
-    // 디버그: 첫 5개 댓글만 로그 (문제 진단용)
-    if (newFiltered === 0 && !shouldFilter && filteredTexts.length > 0) {
-      const firstFt = filteredTexts[0];
-      if (!htmlEl.dataset.guardDebugLogged) {
-        htmlEl.dataset.guardDebugLogged = 'true';
-        console.log(`[GuardFilter:debug] DOM="${normalized.substring(0, 50)}" vs FILTER="${firstFt.substring(0, 50)}"`);
-      }
+    const entry = findEntry(container, textEl);
+    if (!entry) {
+      textEl.dataset.guardProcessed = 'pass';
+      return;
     }
 
-    if (shouldFilter) {
-      htmlEl.dataset.originalText = originalText;
-      htmlEl.dataset.guardProcessed = 'filtered';
-      htmlEl.textContent = '🚫 필터링된 댓글입니다.';
-      htmlEl.style.color = '#ef4444';
-      htmlEl.style.fontStyle = 'italic';
-      newFiltered++;
+    textEl.dataset.originalText = originalText;
+
+    if (entry.action === 'FULL_BLOCK') {
+      textEl.dataset.guardProcessed = 'blocked';
+      textEl.textContent = '🚫 필터링된 댓글입니다.';
+      textEl.style.color = '#ef4444';
+      textEl.style.fontStyle = 'italic';
     } else {
-      htmlEl.dataset.guardProcessed = 'pass';
+      // PARTIAL_MASK: 서버가 생성한 masked_text 로 치환, 주황색 강조.
+      textEl.dataset.guardProcessed = 'masked';
+      textEl.textContent = entry.maskedText || originalText;
+      textEl.style.color = '#ea580c';
+      textEl.style.fontStyle = 'normal';
     }
+    newFiltered++;
   });
 
   if (newFiltered > 0) {
@@ -82,7 +136,7 @@ function applyFilter() {
 }
 
 function resetAllFilters() {
-  document.querySelectorAll<HTMLElement>('[data-guard-processed]').forEach(el => {
+  document.querySelectorAll<HTMLElement>('[data-guard-processed]').forEach((el) => {
     if (el.dataset.originalText) {
       el.textContent = el.dataset.originalText;
       el.style.color = '';
@@ -98,7 +152,7 @@ function scheduleApplyFilter() {
   applyTimeout = setTimeout(() => {
     applyTimeout = null;
     applyFilter();
-  }, 300);
+  }, 200);
 }
 
 // ── Observer ──
@@ -119,7 +173,8 @@ async function init() {
 
   if (videoId !== currentVideoId) {
     currentVideoId = videoId;
-    filteredTexts = [];
+    entriesById = new Map();
+    entriesByText = new Map();
     resetAllFilters();
   }
 
@@ -139,13 +194,17 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
-// ── 스토리지 변경 감지 (메시지를 놓쳐도 스토리지 변경으로 감지) ──
+// ── 스토리지 변경 감지 ──
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes[FILTER_RESULT_KEY]) {
     console.log('[GuardFilter] 스토리지 변경 감지');
-    const newData = changes[FILTER_RESULT_KEY].newValue as { videoId: string; texts: string[] } | undefined;
-    if (newData && newData.videoId === currentVideoId && newData.texts) {
-      filteredTexts = newData.texts;
+    const newData = changes[FILTER_RESULT_KEY].newValue as
+      | { videoId: string; entries?: FilterEntry[] }
+      | undefined;
+    if (newData && newData.videoId === currentVideoId) {
+      const list = newData.entries ?? [];
+      entriesById = new Map(list.map(e => [e.id, e]));
+      entriesByText = new Map(list.map(e => [e.textNorm, e]));
       resetAllFilters();
       applyFilter();
     }

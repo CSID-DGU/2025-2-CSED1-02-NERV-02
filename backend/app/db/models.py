@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, ForeignKey, UniqueConstraint, Boolean, Float, Integer, Text, DateTime
+from sqlalchemy import String, ForeignKey, UniqueConstraint, Boolean, Integer, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -12,10 +12,9 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(50), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     
-    security_level: Mapped[int] = mapped_column(default=3)           
-    risk_threshold: Mapped[float] = mapped_column(default=0.65)          
+    security_level: Mapped[str] = mapped_column(String(10), default="MEDIUM")
 
-    # 2차 필터링 개발 방향에 따라 삭제 가능성 있음
+    ai_soften_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     use_detail_ai_model: Mapped[bool] = mapped_column(Boolean, default=False)
     enabled_modules: Mapped[str] = mapped_column(String(255), default="ALL")
 
@@ -47,15 +46,6 @@ class UserDictionary(Base):
     )
 
 
-class SystemDictionary(Base):
-    __tablename__ = "system_dictionaries"
-    
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    word: Mapped[str] = mapped_column(String(100), unique=True, index=True)
-    category: Mapped[str] = mapped_column(String(50), default="SYSTEM_KEYWORD") 
-    created_at: Mapped[datetime] = mapped_column(default=func.now())
-
-
 class VideoAnalysisCache(Base):
     __tablename__ = "video_analysis_cache"
 
@@ -63,8 +53,8 @@ class VideoAnalysisCache(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     video_id: Mapped[str] = mapped_column(String(32), index=True)
     max_pages: Mapped[int] = mapped_column(Integer, default=1)
-    security_level: Mapped[int] = mapped_column(Integer)
-    risk_threshold: Mapped[float] = mapped_column(Float)
+    security_level: Mapped[str] = mapped_column(String(10))
+    ai_soften_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     enabled_modules: Mapped[str] = mapped_column(String(255), default="ALL")
     payload_json: Mapped[str] = mapped_column(Text)
     analyzed_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
@@ -76,7 +66,7 @@ class VideoAnalysisCache(Base):
             "video_id",
             "max_pages",
             "security_level",
-            "risk_threshold",
+            "ai_soften_enabled",
             "enabled_modules",
             name="uq_video_analysis_cache_key",
         ),
@@ -90,8 +80,8 @@ class CommentAnalysisCache(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     video_id: Mapped[str] = mapped_column(String(32), index=True)
     comment_id: Mapped[str] = mapped_column(String(128), index=True)
-    security_level: Mapped[int] = mapped_column(Integer)
-    risk_threshold: Mapped[float] = mapped_column(Float)
+    security_level: Mapped[str] = mapped_column(String(10))
+    ai_soften_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     enabled_modules: Mapped[str] = mapped_column(String(255), default="ALL")
     payload_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
@@ -103,7 +93,7 @@ class CommentAnalysisCache(Base):
             "video_id",
             "comment_id",
             "security_level",
-            "risk_threshold",
+            "ai_soften_enabled",
             "enabled_modules",
             name="uq_comment_analysis_cache_key",
         ),

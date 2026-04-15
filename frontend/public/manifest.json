@@ -4,16 +4,26 @@
   "version": "1.0.0",
   "description": "Real-time analysis and blocking of chat messages.",
   "icons": {
+    "16": "icons/GuardFilterLogo_16.png",
+    "32": "icons/GuardFilterLogo_32.png",
+    "48": "icons/GuardFilterLogo_48.png",
+    "128": "icons/GuardFilterLogo_128.png"
   },
-  
+
   "background": {
-    "service_worker": "background.js", 
-    "type": "module" 
+    "service_worker": "background.js",
+    "type": "module"
   },
 
   "action": {
-    "default_title": "SafeGuard Settings",
-    "default_popup": "popup.html" 
+    "default_title": "GuardFilter Settings",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/GuardFilterLogo_16.png",
+      "32": "icons/GuardFilterLogo_32.png",
+      "48": "icons/GuardFilterLogo_48.png",
+      "128": "icons/GuardFilterLogo_128.png"
+    }
   },
 
   "permissions": [

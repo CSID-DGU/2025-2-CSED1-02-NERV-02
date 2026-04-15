@@ -6,7 +6,12 @@
 - 공백 삽입: "시 발" → "시발"
 - 쌍자음 치환: "씨발" → "시발"
 - 초성 축약: "ㅅㅂ" → 시발의 초성과 매칭
+- 영한 혼합: "si발" → "ㅅㅣㅂㅏㄹ"
+- 숫자 치환: "시8" → "시ㅂ"
+- 반복 문자: "시이이발" → "시발"
 """
+
+import re
 
 # 한글 유니코드 상수
 _HANGUL_BASE = 0xAC00  # '가'
@@ -36,9 +41,21 @@ SIMILAR_CONSONANT = {
     'ㄲ': 'ㄱ', 'ㄸ': 'ㄷ', 'ㅃ': 'ㅂ', 'ㅆ': 'ㅅ', 'ㅉ': 'ㅈ',
 }
 
-# 초성 판별용 set
-_CONSONANTS = set(CHOSUNG)
+# 영문 → 한글 자모 매핑 (음가 기반)
+_ENG_TO_JAMO = {
+    's': 'ㅅ', 'b': 'ㅂ', 'c': 'ㅋ', 'd': 'ㄷ',
+    'f': 'ㅍ', 'g': 'ㄱ', 'h': 'ㅎ', 'j': 'ㅈ',
+    'k': 'ㅋ', 'l': 'ㄹ', 'm': 'ㅁ', 'n': 'ㄴ',
+    'p': 'ㅂ', 'r': 'ㄹ', 't': 'ㅌ', 'v': 'ㅂ',
+    'w': 'ㅜ', 'x': 'ㅋ', 'z': 'ㅈ',
+    'a': 'ㅏ', 'e': 'ㅔ', 'i': 'ㅣ', 'o': 'ㅗ', 'u': 'ㅜ',
+    'y': 'ㅣ',
+}
 
+# 숫자 → 한글 자모 매핑 (시각적 유사)
+_NUM_TO_JAMO = {
+    '0': 'ㅇ', '1': 'ㅣ', '8': 'ㅂ',
+}
 
 def _is_hangul_syllable(char: str) -> bool:
     return _HANGUL_BASE <= ord(char) <= _HANGUL_END
@@ -56,82 +73,60 @@ def decompose_char(char: str) -> str:
     return result
 
 
-def decompose_text(text: str) -> str:
-    """텍스트의 모든 완성형 한글을 자모로 분리.
-    '시발' → 'ㅅㅣㅂㅏㄹ', 이미 자모인 'ㅅㅂ'는 그대로 유지.
-    """
-    result = []
-    for char in text:
-        if _is_hangul_syllable(char):
-            result.append(decompose_char(char))
-        else:
-            result.append(char)
-    return ''.join(result)
-
-
-def extract_chosung(text: str) -> str:
-    """텍스트에서 초성만 추출. '시발' → 'ㅅㅂ', 'ㅅㅂ' → 'ㅅㅂ'"""
-    result = []
-    for char in text:
-        if _is_hangul_syllable(char):
-            code = ord(char) - _HANGUL_BASE
-            cho = code // (21 * 28)
-            result.append(CHOSUNG[cho])
-        elif char in _CONSONANTS:
-            result.append(char)
-    return ''.join(result)
-
-
 def normalize_similar(jamo_text: str) -> str:
     """쌍자음을 단자음으로 정규화. 'ㅆ' → 'ㅅ', 'ㅉ' → 'ㅈ' 등"""
     return ''.join(SIMILAR_CONSONANT.get(c, c) for c in jamo_text)
 
 
-def is_all_consonants(text: str) -> bool:
-    """텍스트가 모두 자음으로만 구성되어 있는지 확인. 'ㅅㅂ' → True"""
-    return len(text) > 0 and all(c in _CONSONANTS for c in text)
+def normalize_with_map(original_text: str) -> tuple[str, list[int]]:
+    """
+    텍스트를 자모 단위로 정규화하면서, 원본 인덱스를 추적합니다.
+    이 함수가 모든 정규화의 '유일한 핵심 엔진' 역할을 합니다.
+    """
+    jamo_list = []
+    index_map = []
+    
+    # 한글이 포함되어 있는지 확인 (순수 영문/숫자 오탐 방지용)
+    has_hangul = bool(re.search(r'[가-힣ㄱ-ㅣ]', original_text))
 
+    for i, c in enumerate(original_text):
+        # 1. 특수문자, 공백 무시
+        if not (_is_hangul_syllable(c) or ('\u3131' <= c <= '\u3163') or (c.isascii() and c.isalnum())):
+            continue
 
-def levenshtein_distance(s1: str, s2: str, max_dist: int = -1) -> int:
-    """Levenshtein 편집 거리 계산. max_dist 설정 시 초과하면 조기 종료."""
-    len1, len2 = len(s1), len(s2)
-    if abs(len1 - len2) > max_dist > 0:
-        return max_dist + 1
+        c_lower = c.lower()
 
-    prev = list(range(len2 + 1))
-    for i in range(1, len1 + 1):
-        curr = [i] + [0] * len2
-        for j in range(1, len2 + 1):
-            cost = 0 if s1[i - 1] == s2[j - 1] else 1
-            curr[j] = min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost)
-        if max_dist > 0 and min(curr) > max_dist:
-            return max_dist + 1
-        prev = curr
-    return prev[len2]
+        # 2. 영문/숫자 -> 자모 변환 (한글이 섞여 있을 때만)
+        if has_hangul:
+            c_lower = _ENG_TO_JAMO.get(c_lower, c_lower)
+            c_lower = _NUM_TO_JAMO.get(c_lower, c_lower)
 
+        # 3. 자모 분리
+        if _is_hangul_syllable(c_lower):
+            decomposed = decompose_char(c_lower)
+        else:
+            decomposed = c_lower
 
-def similarity_ratio(s1: str, s2: str) -> float:
-    """두 문자열의 유사도 (0.0 ~ 1.0). 1.0이면 동일."""
-    max_len = max(len(s1), len(s2))
-    if max_len == 0:
-        return 1.0
-    dist = levenshtein_distance(s1, s2)
-    return 1.0 - (dist / max_len)
+        # 4. 쌍자음 정규화 및 연속 문자 압축
+        for jamo in decomposed:
+            norm_jamo = normalize_similar(jamo)
+            
+            # 자모 단위 연속 중복 방지 (예: 시이이발 -> ㅅㅣㅂㅏㄹ)
+            # 방금 넣은 자모와 똑같은 자모가 들어오려 하면 무시
+            if jamo_list and jamo_list[-1] == norm_jamo:
+                continue
+                
+            jamo_list.append(norm_jamo)
+            index_map.append(i)
+
+    return "".join(jamo_list), index_map
 
 
 def full_normalize(text: str) -> str:
-    """전체 정규화 파이프라인: 소문자화 → 공백/특수문자 제거 → 자모 분리 → 유사 자모 정규화"""
-    # 1. 소문자화
-    text = text.lower()
-    # 2. 한글(완성형+낱자), 영문, 숫자만 보존 (공백, 특수문자 제거)
-    text = ''.join(
-        c for c in text
-        if _is_hangul_syllable(c)        # 완성형 한글 (가-힣)
-        or '\u3131' <= c <= '\u3163'      # 자모 낱자 (ㄱ-ㅣ)
-        or c.isascii() and c.isalnum()    # 영문+숫자
-    )
-    # 3. 완성형 → 자모 분리
-    text = decompose_text(text)
-    # 4. 쌍자음 → 단자음 정규화
-    text = normalize_similar(text)
-    return text
+    """
+    사전 등록용 단일 정규화 함수.
+    normalize_with_map의 결과에서 맵핑 데이터는 버리고 텍스트만 반환합니다.
+    (두 함수의 로직 불일치 원천 차단)
+    """
+    normalized_text, _ = normalize_with_map(text)
+    return normalized_text

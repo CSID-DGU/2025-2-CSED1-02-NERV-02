@@ -17,8 +17,8 @@ class CommentAnalysisCacheRepository:
         user_id: int,
         video_id: str,
         comment_ids: list[str],
-        security_level: int,
-        risk_threshold: float,
+        security_level: str,
+        ai_soften_enabled: bool,
         enabled_modules: str,
     ) -> dict[str, dict]:
         if not comment_ids:
@@ -30,7 +30,7 @@ class CommentAnalysisCacheRepository:
             .where(CommentAnalysisCache.video_id == video_id)
             .where(CommentAnalysisCache.comment_id.in_(comment_ids))
             .where(CommentAnalysisCache.security_level == security_level)
-            .where(CommentAnalysisCache.risk_threshold == risk_threshold)
+            .where(CommentAnalysisCache.ai_soften_enabled == ai_soften_enabled)
             .where(CommentAnalysisCache.enabled_modules == enabled_modules)
         )
         result = await self.session.execute(stmt)
@@ -43,8 +43,8 @@ class CommentAnalysisCacheRepository:
         user_id: int,
         video_id: str,
         entries: list[dict],
-        security_level: int,
-        risk_threshold: float,
+        security_level: str,
+        ai_soften_enabled: bool,
         enabled_modules: str,
         seen_at: datetime,
     ) -> None:
@@ -57,7 +57,7 @@ class CommentAnalysisCacheRepository:
                 "video_id": video_id,
                 "comment_id": entry["comment_id"],
                 "security_level": security_level,
-                "risk_threshold": risk_threshold,
+                "ai_soften_enabled": ai_soften_enabled,
                 "enabled_modules": enabled_modules,
                 "payload_json": json.dumps(entry["payload"], ensure_ascii=False),
                 "created_at": seen_at,

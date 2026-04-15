@@ -21,8 +21,8 @@ class VideoAnalysisCacheRepository:
         user_id: int,
         video_id: str,
         max_pages: int,
-        security_level: int,
-        risk_threshold: float,
+        security_level: str,
+        ai_soften_enabled: bool,
         enabled_modules: str,
         now: datetime,
     ) -> dict | None:
@@ -32,7 +32,7 @@ class VideoAnalysisCacheRepository:
             .where(VideoAnalysisCache.video_id == video_id)
             .where(VideoAnalysisCache.max_pages == max_pages)
             .where(VideoAnalysisCache.security_level == security_level)
-            .where(VideoAnalysisCache.risk_threshold == risk_threshold)
+            .where(VideoAnalysisCache.ai_soften_enabled == ai_soften_enabled)
             .where(VideoAnalysisCache.enabled_modules == enabled_modules)
             .where(VideoAnalysisCache.expires_at > now)
         )
@@ -54,8 +54,8 @@ class VideoAnalysisCacheRepository:
         user_id: int,
         video_id: str,
         max_pages: int,
-        security_level: int,
-        risk_threshold: float,
+        security_level: str,
+        ai_soften_enabled: bool,
         enabled_modules: str,
         payload: dict,
         analyzed_at: datetime,
@@ -67,7 +67,7 @@ class VideoAnalysisCacheRepository:
             video_id=video_id,
             max_pages=max_pages,
             security_level=security_level,
-            risk_threshold=risk_threshold,
+            ai_soften_enabled=ai_soften_enabled,
             enabled_modules=enabled_modules,
             payload_json=payload_json,
             analyzed_at=analyzed_at,

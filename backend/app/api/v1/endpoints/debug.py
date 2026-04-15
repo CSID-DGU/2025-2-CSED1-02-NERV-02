@@ -71,65 +71,34 @@ async def run_second_pass(
     
 @router.post("/score", response_model=RiskResponse, summary="Step 3. 위험도 점수 계산")
 async def calculate_risk_score(
-    filter_result: FilterResult = Body(
-        ...,
-        # [입력 예시] 2차 필터까지 완료된 상태 (모든 적발 내역 포함)
-        json_schema_extra={
-            "example": {
-                "original_text": "야이 개새끼야 ㅋㅋ 니네 집 주소 다 털었다 010-1234-5678 밤길 조심해라",
-                "status": "FILTERED_BY_SECOND_PASS",
-                "detected_words": [
-                    {"word": "개새끼", "type": "SYSTEM_KEYWORD"},
-                    {"word": "니네 집 주소 다 털었다", "type": "AI_AGGRESSION"},
-                    {"word": "010-1234-5678", "type": "AI_PRIVACY"}
-                ],
-                "masked_text": "야이 __F__야 ㅋㅋ __S__ __S__ __S__"
-            }
-        }
-    ),
+    filter_result: FilterResult = Body(...),
     risk_scorer: RiskScorer = Depends(get_risk_scorer)
 ):
     try:
-        score = risk_scorer.execute(filter_result.model_dump())
-        return {"risk_score": score}
-    except Exception as e:
+        scorer_result = risk_scorer.execute(filter_result.model_dump())
+        return {"risk_score": scorer_result["score"]}
+    except Exception:
         logger.exception("위험도 계산 중 오류 발생")
         raise HTTPException(status_code=500, detail="위험도 계산 실패")
-    
+
 @router.post("/policy", response_model=PolicyResponse, summary="Step 4. 최종 처분 결정")
 async def decide_policy(
-    user_security_level: int = Body(3, description="유저 보안 레벨 (테스트용)"),
-    user_risk_threshold: float = Body(0.65, description="유저 임계값 (테스트용)"),
-    data: PolicyRequest = Body(
-        ...,
-        # [입력 예시] 계산된 점수와 최종 필터링 결과
-        json_schema_extra={
-            "example": {
-                "risk_score": 0.98,
-                "filter_result": {
-                    "original_text": "야이 개새끼야 ㅋㅋ 니네 집 주소 다 털었다 010-1234-5678 밤길 조심해라",
-                    "status": "FILTERED_BY_SECOND_PASS",
-                    "detected_words": [
-                        {"word": "개새끼", "type": "SYSTEM_KEYWORD"},
-                        {"word": "니네 집 주소 다 털었다", "type": "AI_AGGRESSION"},
-                        {"word": "010-1234-5678", "type": "AI_PRIVACY"}
-                    ],
-                    "masked_text": "야이 __F__야 ㅋㅋ __S__ __S__ __S__"
-                }
-            }
-        }
-    ),
+    security_level: str = Body("MEDIUM", description="보안 모드 (LOW/MEDIUM/HIGH)"),
+    ai_soften_enabled: bool = Body(False, description="AI 순화 마스킹 여부"),
+    data: PolicyRequest = Body(...),
+    risk_scorer: RiskScorer = Depends(get_risk_scorer),
     policy_manager: PolicyManager = Depends(get_policy_manager)
 ):
     try:
+        scorer_result = risk_scorer.execute(data.filter_result.model_dump())
         decision = policy_manager.decide_action(
-            risk_score=data.risk_score,
+            scorer_result=scorer_result,
             filter_result=data.filter_result.model_dump(),
-            user_security_level=user_security_level,
-            user_risk_threshold=user_risk_threshold
+            security_level=security_level,
+            ai_soften_enabled=ai_soften_enabled,
         )
         return decision
-    except Exception as e:
+    except Exception:
         logger.exception("정책 결정 중 오류 발생")
         raise HTTPException(status_code=500, detail="정책 적용 실패")
     

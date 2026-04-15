@@ -5,6 +5,7 @@ import ChatTab from '../features/chat/ChatTab';
 import ModuleTab from '../features/modules/ModuleTab';
 import FilterTab from '../features/filter/FilterTab';
 import AnalysisTab from '../features/analysis/AnalysisTab';
+import { AnalysisProvider } from '../features/analysis/AnalysisContext';
 import { login, register } from '../api/services';
 
 type TabType = 'CHAT' | 'MODULE' | 'FILTER' | 'ANALYSIS';
@@ -176,16 +177,18 @@ const AppView = ({ onLogout }: { onLogout: () => void }) => {
   const [activeTab, setActiveTab] = useState<TabType>('CHAT');
 
   return (
-    <div className="w-[800px] h-[600px] flex flex-col bg-white">
-      <Header onLogout={onLogout} />
-      <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
-      <main className="flex-1 overflow-y-auto p-4 bg-gray-50">
-        {activeTab === 'CHAT' && <ChatTab />}
-        {activeTab === 'MODULE' && <ModuleTab />}
-        {activeTab === 'FILTER' && <FilterTab />}
-        {activeTab === 'ANALYSIS' && <AnalysisTab />}
-      </main>
-    </div>
+    <AnalysisProvider>
+      <div className="w-[800px] h-[600px] flex flex-col bg-white">
+        <Header onLogout={onLogout} />
+        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+        <main className="flex-1 overflow-y-auto p-4 bg-gray-50">
+          {activeTab === 'CHAT' && <ChatTab />}
+          {activeTab === 'MODULE' && <ModuleTab />}
+          {activeTab === 'FILTER' && <FilterTab />}
+          {activeTab === 'ANALYSIS' && <AnalysisTab />}
+        </main>
+      </div>
+    </AnalysisProvider>
   );
 };
 

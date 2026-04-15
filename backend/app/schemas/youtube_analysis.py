@@ -5,6 +5,9 @@ from app.schemas.enums import WordType, ModerationAction
 class VideoInfo(BaseModel):
     title: str
     id: str
+    tags: list[str] = []
+    category: str | None = None
+    topics: list[str] = []
 
 class YoutubeAnalysisRequest(BaseModel):
     """유튜브 영상 분석 요청"""
@@ -16,6 +19,7 @@ class RawComment(BaseModel):
     text: str
     author: str
     published_at: datetime
+    parent_id: str | None = None
 
 class YoutubeAnalysisResponse(BaseModel):
     """유튜브 영상 분석 응답"""
