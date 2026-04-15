@@ -3,18 +3,34 @@ export interface RawComment {
   text: string;
   author: string;
   published_at: string;
+  parent_id?: string | null;
+}
+
+export interface VideoInfo {
+  title: string;
+  id: string;
+  tags: string[];
+  category: string | null;
+  topics: string[];
 }
 
 export interface YoutubeAnalysisResponse {
-  video_info: {
-    title: string;
-    id: string;
-  };
+  video_info: VideoInfo;
   total_comments: number;
   results: RawComment[];
 }
 
-export type ModerationAction = 'PASS' | 'MASKING' | 'REVIEW_HUMAN' | 'AUTO_HIDE' | 'PERMANENT_DELETE';
+export type SecurityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export type ModerationAction = 'NORMAL' | 'REVIEW' | 'PARTIAL_MASK' | 'FULL_BLOCK' | 'ERROR';
+
+export type KeywordMode = 'IGNORE' | 'FILTER' | 'TRIGGER';
+
+export interface ScorerFlags {
+  has_blacklist: boolean;
+  has_general: boolean;
+  has_trigger: boolean;
+}
 
 export interface TextAnalysisResponse {
   original_text: string;
@@ -27,6 +43,13 @@ export interface TextAnalysisResponse {
     detected_words: { word: string; type: string }[];
     masked_text: string;
   };
+  flags: ScorerFlags;
+}
+
+export interface AnalyzeTextsRequest {
+  comments: RawComment[];
+  video_id?: string | null;
+  keyword_modes?: Record<string, KeywordMode>;
 }
 
 export interface AnalyzedComment {
@@ -34,22 +57,23 @@ export interface AnalyzedComment {
   text: string;
   author: string;
   published_at: string;
-  processed_text: string;
-  action: ModerationAction;
+  parent_id?: string | null;
+  masked_text: string;
   score: number;
   detected_words: { word: string; type: string }[];
+  flags: ScorerFlags;
 }
 
 export interface FullAnalysisResponse {
-  video_info: { title: string; id: string };
+  video_info: VideoInfo;
   total_comments: number;
   results: AnalyzedComment[];
 }
 
 export interface SystemConfigResponse {
   user_id: number;
-  security_level: number;
-  risk_threshold: number;
+  security_level: SecurityLevel;
+  ai_soften_enabled: boolean;
   use_detail_ai_model: boolean;
   enabled_modules: string;
   youtube_channel_id: string | null;
@@ -66,22 +90,23 @@ export interface YoutubeChannelInfo {
 }
 
 export interface SystemConfigUpdate {
-  security_level?: number | null;
-  risk_threshold?: number | null;
+  security_level?: SecurityLevel | null;
+  ai_soften_enabled?: boolean | null;
   use_detail_ai_model?: boolean | null;
-  enabled_modules?: string | null;        // string[] -> string
+  enabled_modules?: string | null;
 }
 
 export interface AppSettings {
-  intensity: number; // 1~5
+  intensity: SecurityLevel;
+  aiSoftenEnabled: boolean;
   modules: {
-    modified: boolean;   // MODIFIED
-    sexual: boolean;     // SEXUAL
-    privacy: boolean;    // PRIVACY
-    aggression: boolean; // AGGRESSION
-    political: boolean;  // POLITICAL
-    spam: boolean;       // SPAM
-    family: boolean;     // FAMILY
+    modified: boolean;
+    sexual: boolean;
+    privacy: boolean;
+    aggression: boolean;
+    political: boolean;
+    spam: boolean;
+    family: boolean;
   };
 }
 
@@ -113,8 +138,8 @@ export interface DictionaryRequest {
 }
 
 export interface DictionaryResponse {
-  whitelist?: string[]; 
-  blacklist?: string[]; 
+  whitelist?: string[];
+  blacklist?: string[];
   total_count: number;
 }
 

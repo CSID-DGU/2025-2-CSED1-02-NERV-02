@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { YoutubeAnalysisResponse, TextAnalysisResponse, RawComment, SystemConfigResponse, SystemConfigUpdate, DictionaryResponse, DictionaryUpdateResponse, KeywordAnalysisResponse, YoutubeChannelInfo, FilterDictionaryResponse } from './types';
+import type { YoutubeAnalysisResponse, TextAnalysisResponse, RawComment, SystemConfigResponse, SystemConfigUpdate, DictionaryResponse, DictionaryUpdateResponse, KeywordAnalysisResponse, YoutubeChannelInfo, FilterDictionaryResponse, KeywordMode } from './types';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -63,8 +63,15 @@ export const fetchAnalysis = async (videoId: string): Promise<YoutubeAnalysisRes
 
 
 // 1-2. 댓글 필터링 분석
-export const fetchTextAnalysis = async (comments: RawComment[]): Promise<TextAnalysisResponse[]> => {
-  const response = await client.post<TextAnalysisResponse[]>(`/api/analyses/text`, comments);
+export const fetchTextAnalysis = async (
+  comments: RawComment[],
+  options: { videoId?: string | null; keywordModes?: Record<string, KeywordMode> } = {}
+): Promise<TextAnalysisResponse[]> => {
+  const response = await client.post<TextAnalysisResponse[]>(`/api/analyses/text`, {
+    comments,
+    video_id: options.videoId ?? null,
+    keyword_modes: options.keywordModes ?? {},
+  });
   return response.data;
 };
 // 2. 시스템 설정 조회 (GET)
@@ -104,8 +111,15 @@ export const deleteDictionaryWord = async (listType: 'whitelist' | 'blacklist', 
 };
 
 // 7. 키워드 분석 (POST)
-export const fetchKeywordAnalysis = async (comments: RawComment[]): Promise<KeywordAnalysisResponse> => {
-  const response = await client.post<KeywordAnalysisResponse>('/api/analyses/keywords', comments);
+export const fetchKeywordAnalysis = async (
+  comments: RawComment[],
+  options: { videoId?: string | null; keywordModes?: Record<string, KeywordMode> } = {}
+): Promise<KeywordAnalysisResponse> => {
+  const response = await client.post<KeywordAnalysisResponse>('/api/analyses/keywords', {
+    comments,
+    video_id: options.videoId ?? null,
+    keyword_modes: options.keywordModes ?? {},
+  });
   return response.data;
 };
 

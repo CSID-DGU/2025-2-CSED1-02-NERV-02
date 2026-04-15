@@ -43,7 +43,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         const textRes = await fetch('http://localhost:8000/api/analyses/text', {
           method: 'POST',
           headers,
-          body: JSON.stringify(rawComments)
+          body: JSON.stringify({ comments: rawComments, video_id: message.videoId, keyword_modes: {} })
         });
         if (!textRes.ok) { sendResponse({ ok: false, error: `Text API error: ${textRes.status}` }); return; }
         const textData: Array<{ original_text: string; processed_text: string; action: string }> = await textRes.json();
@@ -96,7 +96,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         const res = await fetch('http://localhost:8000/api/analyses/text', {
           method: 'POST',
           headers,
-          body: JSON.stringify(comments)
+          body: JSON.stringify({ comments, video_id: null, keyword_modes: {} })
         });
         if (!res.ok) { sendResponse({ ok: false, error: `Text API error: ${res.status}` }); return; }
         const data: Array<{ original_text: string; processed_text: string; action: string }> = await res.json();

@@ -3,15 +3,15 @@ from app.core import settings
 from app.core.logging import setup_logging
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
+from app.services.filtering.kiwi_engine import KiwiEngine
 from app.services.filtering.first_pass_filter import FirstPassFilter
 from app.services.filtering.second_pass_filter import SecondPassFilter
 from app.services.filtering.risk_scorer import RiskScorer
 from app.services.filtering.policy_manager import PolicyManager
-from app.services.filtering.keyword_extractor import KeywordExtractor
 
-from app.repositories.dictionary import load_system_dict
+from app.services.filtering.system_dict_loader import load_system_dict
 from app.api.v1.api import api_router
-from app.db import Base, engine, AsyncSessionLocal
+from app.db import Base, engine
 
 
 @asynccontextmanager
@@ -19,14 +19,17 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    async with AsyncSessionLocal() as session:
-        app.state.system_dict = await load_system_dict(session)
+    system_dict, system_user_words = load_system_dict()
+    app.state.system_dict = system_dict
 
-    app.state.first_pass_filter = FirstPassFilter()
+    # Kiwi 싱글톤 (FirstPassFilter + 트렌딩 키워드 추출 공유)
+    kiwi_engine = KiwiEngine(system_words=system_user_words)
+    app.state.kiwi_engine = kiwi_engine
+
+    app.state.first_pass_filter = FirstPassFilter(kiwi_engine)
     app.state.second_pass_filter = SecondPassFilter()
     app.state.risk_scorer = RiskScorer()
     app.state.policy_manager = PolicyManager()
-    app.state.keyword_extractor = KeywordExtractor()
 
     yield
 

@@ -10,6 +10,7 @@ from .text_analysis import (
     PolicyRequest,
     PolicyResponse,
     TextAnalysisResponse,
+    ScorerFlags,
 )
 from .youtube_analysis import (
     VideoInfo,

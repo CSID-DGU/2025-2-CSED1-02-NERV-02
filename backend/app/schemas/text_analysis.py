@@ -41,11 +41,19 @@ class PolicyRequest(BaseModel):
 
 class PolicyResponse(BaseModel):
     """정책 결정 응답"""
-    action: ModerationAction = Field(..., description="최종 처분 결과", json_schema_extra={"example": "AUTO_HIDE"})
-    processed_text: str = Field(..., description="최종 노출 텍스트", json_schema_extra={"example": "규정 위반으로 숨겨진 메시지입니다."})
+    action: ModerationAction = Field(..., description="최종 처분 결과", json_schema_extra={"example": "FULL_BLOCK"})
+    processed_text: str = Field(..., description="최종 노출 텍스트", json_schema_extra={"example": "야이 *** ㅋㅋ ..."})
     score: float = Field(..., json_schema_extra={"example": 0.98})
 
 # [통합 결과 모델]
+
+class ScorerFlags(BaseModel):
+    """RiskScorer가 반환하는 카테고리 플래그. 프론트엔드가 보안 모드 변경 시
+    서버 재호출 없이 action/processed_text를 재유도할 수 있도록 노출한다."""
+    has_blacklist: bool = False
+    has_general: bool = False
+    has_trigger: bool = False
+
 
 class TextAnalysisResponse(BaseModel):
     """분석 최종 결과"""
@@ -54,3 +62,4 @@ class TextAnalysisResponse(BaseModel):
     action: ModerationAction
     score: float
     details: FilterResult
+    flags: ScorerFlags

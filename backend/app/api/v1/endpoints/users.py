@@ -13,7 +13,8 @@ from app.services.dictionary_service import DictionaryService
 from app.services.user_service import UserService
 from app.services.youtube_analysis_service import YoutubeAnalysisService
 from app.repositories.dictionary import DictionaryRepository
-from app.services.filtering.variant_generator import build_normalized_dictionary
+from app.services.filtering.jamo_normalizer import full_normalize
+from app.schemas.enums import WordType
 import hashlib
 
 router = APIRouter()
@@ -107,14 +108,31 @@ async def get_filter_dictionary(
     user: User = Depends(get_current_user),
     dict_repo: DictionaryRepository = Depends(get_dictionary_repository),
 ):
-    """변형 포함 정규화 사전을 반환합니다. 클라이언트가 로컬 필터링에 사용."""
+    """정규화(자모) 사전을 반환합니다. 클라이언트가 로컬 필터링에 사용."""
     dicts = await dict_repo.load_dictionaries(user.id)
-    result = build_normalized_dictionary(dicts.system_dict, dicts.blacklist, dicts.whitelist)
+
+    # 각 단어를 자모 정규화 → 패턴 맵 생성
+    # dic.json이 이미 변형(variants)을 포함하므로 별도 variant 생성 불필요
+    patterns: dict[str, dict] = {}
+    for word in dicts.system_dict:
+        norm = full_normalize(word)
+        if norm and norm not in patterns:
+            patterns[norm] = {"original": word, "type": WordType.SYSTEM_KEYWORD}
+
+    # 유저 블랙리스트는 시스템 사전보다 우선
+    for word in dicts.blacklist:
+        norm = full_normalize(word)
+        if norm:
+            patterns[norm] = {"original": word, "type": WordType.USER_BLACKLIST}
+
+    whitelist_jamo = [full_normalize(w) for w in dicts.whitelist if full_normalize(w)]
 
     raw = "|".join(sorted(dicts.whitelist) + sorted(dicts.blacklist) + sorted(dicts.system_dict))
-    result["version"] = hashlib.md5(raw.encode()).hexdigest()
-
-    return result
+    return {
+        "patterns": patterns,
+        "whitelist": whitelist_jamo,
+        "version": hashlib.md5(raw.encode()).hexdigest(),
+    }
 
 
 @router.get("/settings", response_model=UserSettingsResponse, summary="유저 개인 설정 조회")
@@ -129,7 +147,7 @@ async def get_user_settings(
     return {
         "user_id": user.id,
         "security_level": user.security_level,
-        "risk_threshold": user.risk_threshold,
+        "ai_soften_enabled": user.ai_soften_enabled,
         "use_detail_ai_model": user.use_detail_ai_model,
         "enabled_modules": user.enabled_modules,
         "youtube_channel_id": user.youtube_channel_id,
@@ -151,7 +169,7 @@ async def update_user_settings(
     return {
         "user_id": user.id,
         "security_level": user.security_level,
-        "risk_threshold": user.risk_threshold,
+        "ai_soften_enabled": user.ai_soften_enabled,
         "use_detail_ai_model": user.use_detail_ai_model,
         "enabled_modules": user.enabled_modules,
         "youtube_channel_id": user.youtube_channel_id,

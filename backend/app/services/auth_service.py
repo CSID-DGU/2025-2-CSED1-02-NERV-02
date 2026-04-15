@@ -27,12 +27,6 @@ class AuthService:
             )
 
         user = await self.repo.create_user_with_password(username, password)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="사용자 생성에 실패했습니다."
-            )
-
         return self._create_token(user)
 
     async def login(self, username: str, password: str) -> Token:

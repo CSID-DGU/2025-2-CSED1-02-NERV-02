@@ -12,25 +12,6 @@ const MODULE_MAP: Record<keyof AppSettings['modules'], string> = {
   family: 'FAMILY',
 };
 
-// [기본값 정의] 서버 에러 시 보여줄 기본 설정
-// const DEFAULT_SETTINGS: AppSettings = {
-//   intensity: 3,
-//   modules: {
-//     modified: false,
-//     sexual: false,
-//     privacy: false,
-//     aggression: false,
-//     political: false,
-//     spam: false,
-//     family: false,
-//   },
-// };
-
-const MOCK_DICTIONARY = {
-  whitelist: [],
-  blacklist: []
-};
-
 // [변환기] 백엔드 -> 프론트엔드
 const transformToAppSettings = (data: SystemConfigResponse): AppSettings => {
   const modules: AppSettings['modules'] = {
@@ -43,7 +24,6 @@ const transformToAppSettings = (data: SystemConfigResponse): AppSettings => {
     family: false,
   };
 
-  // enabled_modules가 문자열이므로 split으로 배열로 변환
   const enabledModulesArray = data.enabled_modules ? data.enabled_modules.split(',').map(m => m.trim()) : [];
 
   (Object.keys(MODULE_MAP) as Array<keyof typeof MODULE_MAP>).forEach((uiKey) => {
@@ -55,8 +35,8 @@ const transformToAppSettings = (data: SystemConfigResponse): AppSettings => {
 
   return {
     intensity: data.security_level,
+    aiSoftenEnabled: data.ai_soften_enabled,
     modules,
-    // [수정] 여기서도 whiteList, blackList 리턴하던 코드 삭제!
   };
 };
 
@@ -72,8 +52,25 @@ const transformToBackendUpdate = (settings: AppSettings) => {
 
   return {
     security_level: settings.intensity,
-    enabled_modules: enabled_modules_array.join(','), // 배열을 콤마 구분 문자열로 변환
+    ai_soften_enabled: settings.aiSoftenEnabled,
+    enabled_modules: enabled_modules_array.join(','),
   };
+};
+
+// SystemConfigResponse placeholder — initialData 가 아니라 placeholderData 로 사용해야
+// TanStack 이 데이터를 "seeded & fresh" 로 간주하지 않고 즉시 fetchSystemConfig 를 실행한다.
+// 기존엔 initialData + staleTime:Infinity 조합 탓에 로그인 직후 유튜브 채널이
+// null 로 고정되어 있다가 focus 등 외부 트리거로만 갱신되는 지연 버그가 있었다.
+const PLACEHOLDER_CONFIG: SystemConfigResponse = {
+  user_id: 0,
+  security_level: 'MEDIUM',
+  enabled_modules: 'ALL',
+  ai_soften_enabled: false,
+  use_detail_ai_model: false,
+  youtube_channel_id: null,
+  youtube_channel_name: null,
+  youtube_channel_url: null,
+  youtube_thumbnail_url: null,
 };
 
 // 1. 설정 조회 Hook (Config API)
@@ -82,19 +79,8 @@ export const useSettings = () => {
     queryKey: ['system-config'],
     queryFn: () => fetchSystemConfig(),
     select: transformToAppSettings,
-    // 초기값에서 SystemConfigResponse 형태를 맞춰줌
-    initialData: {
-      user_id: 1,
-      security_level: 3,
-      enabled_modules: 'ALL',
-      risk_threshold: 0.65,
-      use_detail_ai_model: false,
-      youtube_channel_id: null,
-      youtube_channel_name: null,
-      youtube_channel_url: null,
-      youtube_thumbnail_url: null,
-    } as SystemConfigResponse,
-    staleTime: Infinity,
+    placeholderData: PLACEHOLDER_CONFIG,
+    staleTime: 1000 * 60 * 5,
   });
 };
 
@@ -103,6 +89,8 @@ export const useYoutubeChannel = () => {
   return useQuery({
     queryKey: ['system-config'],
     queryFn: () => fetchSystemConfig(),
+    placeholderData: PLACEHOLDER_CONFIG,
+    staleTime: 1000 * 60 * 5,
     select: (data: SystemConfigResponse) => ({
       channel_id: data.youtube_channel_id,
       channel_name: data.youtube_channel_name,
@@ -143,21 +131,18 @@ export const useUpdateSettings = () => {
       const payload = transformToBackendUpdate(newSettings);
       return updateSystemConfig(payload);
     },
-    
-    // 낙관적 업데이트
+
     onMutate: async (newSettings) => {
       await queryClient.cancelQueries({ queryKey: ['system-config'] });
-      // const previousSettings = queryClient.getQueryData(['system-config']); 
-
-      // 캐시 강제 업데이트
-      queryClient.setQueryData(['system-config'], newSettings); // 이제 타입이 딱 맞습니다.
-
-      // return { previousSettings };
+      queryClient.setQueryData(['system-config'], newSettings);
     },
 
     onError: (err) => {
       console.error("설정 저장 실패 (화면 유지):", err);
     },
+
+    // 보안 모드/모듈 변경은 클라이언트 derivePolicy로 즉시 반영된다.
+    // 따라서 full-analysis / keyword-analysis 캐시를 무효화할 필요가 없다 (= 재분석 금지).
 
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['system-config'] });
@@ -170,18 +155,11 @@ export const useDictionary = () => {
   return useQuery({
     queryKey: ['system-dictionary'],
     queryFn: async () => {
-      try {
-        // 백엔드가 이제 whitelist + blacklist를 한 번에 반환
-        const result = await fetchDictionary();
-        
-        return {
-          whitelist: result.whitelist || [],
-          blacklist: result.blacklist || []
-        };
-      } catch (error) {
-        console.warn("서버 연결 실패, 목 데이터를 반환합니다.");
-        return MOCK_DICTIONARY;
-      }
+      const result = await fetchDictionary();
+      return {
+        whitelist: result.whitelist || [],
+        blacklist: result.blacklist || [],
+      };
     },
     staleTime: 1000 * 60 * 5,
   });
