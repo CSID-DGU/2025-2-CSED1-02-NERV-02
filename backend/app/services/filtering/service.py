@@ -87,6 +87,7 @@ class TextAnalysisService:
         filter_result = self.first_pass.execute(
             text, effective_whitelist, effective_blacklist, effective_system_dict, dict_version
         )
+        filter_result = await self.second_pass.execute(filter_result)
         return self._build_response(user, text, filter_result, ctx)
 
     async def analyze_texts(
@@ -104,7 +105,12 @@ class TextAnalysisService:
             texts, effective_whitelist, effective_blacklist, effective_system_dict, dict_version
         )
 
+        second_pass_results = [
+            await self.second_pass.execute(fr)
+            for fr in filter_results
+        ]
+        
         return [
             self._build_response(user, text, fr, ctx)
-            for text, fr in zip(texts, filter_results)
+            for text, fr in zip(texts, second_pass_results)
         ]
