@@ -18,12 +18,15 @@ class Settings(BaseSettings):
     VIDEO_ANALYSIS_CACHE_TTL_SECONDS: int = 3600
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000"]
     
+    HF_TOKEN: str
+    HF_MODEL_OWNER: str
+    
     _SPECIAL_AI_MODULE_DEFINITIONS: Dict[str, str] = {
-        'MODIFIED': '자음/모음 분리(예: ㅂㅅ), 특수문자 삽입, 야민정음 등 필터링 회피 시도',
+        'BASIC': '1차에서 잡지 못한 기본 욕설(회피 포함)',
         'SEXUAL': '성적 수치심 유발, 음란한 묘사, 성희롱',
-        'PRIVACY': '전화번호, 주소, 실명, 계좌번호 등 개인정보 유출',
-        'AGGRESSION': '특정 대상에 대한 맹목적 비난, 살해 협박, 저주',
-        'POLITICAL': '영상 맥락과 무관한 정치적 선동, 혐오 발언',
+        'PII': '전화번호, 주소, 실명, 계좌번호 등 개인정보 유출',
+        'CRITICISM': '특정 대상에 대한 맹목적 비난, 살해 협박, 저주',
+        'POLITICS': '영상 맥락과 무관한 정치적 선동, 혐오 발언',
         'SPAM': '광고, 도배, 무의미한 문자열 반복',
         'FAMILY': '가족(부모, 자녀 등)을 비하하거나 모욕하는 패륜적 발언'
     }
