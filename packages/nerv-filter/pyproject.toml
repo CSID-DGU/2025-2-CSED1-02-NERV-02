@@ -1,0 +1,76 @@
+[build-system]
+requires = ["hatchling>=1.18.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nerv-filter"
+dynamic = ["version"]
+description = "Korean profanity filter with morphological analysis (Kiwi + Aho-Corasick)"
+authors = [
+    {name = "NERV Team"},
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = [
+    "korean", "profanity", "filter", "moderation",
+    "nlp", "kiwi", "morphology", "aho-corasick",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Linguistic",
+    "Topic :: Text Processing :: Filters",
+    "Natural Language :: Korean",
+]
+dependencies = [
+    "kiwipiepy>=0.17.0",
+    "pyahocorasick>=2.0.0",
+]
+
+[project.optional-dependencies]
+cli = ["click>=8.0"]
+ai = ["openai>=1.0"]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+    "click>=8.0",
+    "build>=1.0",
+    "twine>=4.0",
+]
+
+[project.scripts]
+nerv-filter = "nerv_filter.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/CSID-DGU/2025-2-CSED1-02-NERV-02"
+Repository = "https://github.com/CSID-DGU/2025-2-CSED1-02-NERV-02"
+
+[tool.hatch.version]
+path = "src/nerv_filter/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nerv_filter"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/nerv_filter/dict/default_dic.json" = "nerv_filter/dict/default_dic.json"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B"]
+ignore = ["E501"]
