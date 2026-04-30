@@ -33,7 +33,6 @@ from .models import (
     WordType,
 )
 
-
 # 함수형 1줄 사용 — 내부적으로 싱글톤 인스턴스 재사용
 _default_filters: dict[SecurityLevel, NervFilter] = {}
 

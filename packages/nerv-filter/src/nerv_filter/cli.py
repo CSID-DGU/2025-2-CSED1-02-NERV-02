@@ -74,7 +74,7 @@ def info() -> None:
     flt = NervFilter()
     click.echo(f"nerv-filter version: {__version__}")
     click.echo(f"Dictionary size: {flt.get_dictionary_size():,} words")
-    click.echo(f"Default security level: MEDIUM")
+    click.echo("Default security level: MEDIUM")
 
 
 def _print_result(result, as_json: bool) -> None:

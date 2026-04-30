@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import logging
 from collections import OrderedDict
-from typing import List, Tuple
 
 import ahocorasick
 from kiwipiepy import Token
@@ -33,7 +32,7 @@ from .normalizer import compact_normalize
 logger = logging.getLogger(__name__)
 
 
-_AhoCacheEntry = Tuple[ahocorasick.Automaton, ahocorasick.Automaton]
+_AhoCacheEntry = tuple[ahocorasick.Automaton, ahocorasick.Automaton]
 
 
 class FirstPassFilter:
@@ -121,7 +120,7 @@ class FirstPassFilter:
 
     def execute_batch(
         self,
-        texts: List[str],
+        texts: list[str],
         whitelist: set,
         blacklist: set,
         system_dict: set,
@@ -143,7 +142,7 @@ class FirstPassFilter:
                 match_auto,
                 white_auto,
             )
-            for text, tokens in zip(texts, tokens_list)
+            for text, tokens in zip(texts, tokens_list, strict=False)
         ]
 
     # ──────────────────────────────────────────────
@@ -152,7 +151,7 @@ class FirstPassFilter:
     def _analyze_one(
         self,
         original_text: str,
-        tokens: List[Token],
+        tokens: list[Token],
         whitelist: set,
         blacklist: set,
         system_dict: set,

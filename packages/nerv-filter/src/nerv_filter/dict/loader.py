@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterable
 from importlib.resources import files
 from pathlib import Path
-from typing import Iterable, Tuple
 
 from ..core.kiwi_engine import KiwiUserWord
 from ..exceptions import DictionaryError
@@ -32,12 +32,12 @@ def get_default_dict_path() -> Path:
     return Path(str(files("nerv_filter.dict") / "default_dic.json"))
 
 
-def load_default_dict() -> Tuple[set[str], list[KiwiUserWord]]:
+def load_default_dict() -> tuple[set[str], list[KiwiUserWord]]:
     """패키지 동봉 사전 로드."""
     return load_dict(get_default_dict_path())
 
 
-def load_dict(path: str | Path) -> Tuple[set[str], list[KiwiUserWord]]:
+def load_dict(path: str | Path) -> tuple[set[str], list[KiwiUserWord]]:
     """사용자 지정 사전 로드.
 
     Returns:
@@ -57,7 +57,7 @@ def load_dict(path: str | Path) -> Tuple[set[str], list[KiwiUserWord]]:
     return _build_word_set(data)
 
 
-def _build_word_set(data: dict) -> Tuple[set[str], list[KiwiUserWord]]:
+def _build_word_set(data: dict) -> tuple[set[str], list[KiwiUserWord]]:
     words: set[str] = set()
     user_words: list[KiwiUserWord] = []
 
@@ -84,7 +84,7 @@ def _build_word_set(data: dict) -> Tuple[set[str], list[KiwiUserWord]]:
     return words, user_words
 
 
-def _parse_entry(payload) -> Tuple[str, Iterable[str]]:
+def _parse_entry(payload) -> tuple[str, Iterable[str]]:
     """엔트리 포맷 정규화. dict 또는 list 모두 허용."""
     if isinstance(payload, dict):
         pos = payload.get("pos", _DEFAULT_POS)

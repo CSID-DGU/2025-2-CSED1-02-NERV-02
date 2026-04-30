@@ -12,7 +12,6 @@
 from __future__ import annotations
 
 import re
-from typing import List, Tuple
 
 _LETTER_RE = re.compile(r"[가-힣A-Za-z]")
 
@@ -22,7 +21,7 @@ def is_letter(ch: str) -> bool:
     return bool(_LETTER_RE.match(ch))
 
 
-def compact_normalize(text: str) -> Tuple[str, List[int]]:
+def compact_normalize(text: str) -> tuple[str, list[int]]:
     """letter 사이 short-noise 를 제거한 축약 텍스트 + 원문 인덱스 맵 반환.
 
     Returns:

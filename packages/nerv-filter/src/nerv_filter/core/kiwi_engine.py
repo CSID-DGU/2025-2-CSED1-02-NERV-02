@@ -22,8 +22,9 @@ from __future__ import annotations
 import logging
 import threading
 from collections import Counter
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Iterable, List, Sequence, cast
+from typing import cast
 
 from kiwipiepy import Kiwi, Token
 from kiwipiepy._wrap import POSTag
@@ -118,7 +119,7 @@ class KiwiEngine:
     # ──────────────────────────────────────────────
     # 토큰화
     # ──────────────────────────────────────────────
-    def tokenize(self, text: str) -> List[Token]:
+    def tokenize(self, text: str) -> list[Token]:
         result = self._kiwi.tokenize(
             text,
             normalize_coda=True,
@@ -128,9 +129,9 @@ class KiwiEngine:
             stopwords=self._stopwords,
             oov_handling="chr_freq",
         )
-        return cast(List[Token], result)
+        return cast(list[Token], result)
 
-    def tokenize_batch(self, texts: Sequence[str]) -> List[List[Token]]:
+    def tokenize_batch(self, texts: Sequence[str]) -> list[list[Token]]:
         """kiwipiepy 네이티브 배치 토큰화."""
         if not texts:
             return []
@@ -144,15 +145,15 @@ class KiwiEngine:
             stopwords=self._stopwords,
             oov_handling="chr_freq",
         )
-        return cast(List[List[Token]], list(gen))
+        return cast(list[list[Token]], list(gen))
 
     # ──────────────────────────────────────────────
     # 의미 형태소 단위 추출 (합성명사 병합 포함)
     # ──────────────────────────────────────────────
     @staticmethod
-    def iter_meaningful_units(tokens: Sequence[Token]) -> List[MeaningfulUnit]:
+    def iter_meaningful_units(tokens: Sequence[Token]) -> list[MeaningfulUnit]:
         """Kiwi 토큰 리스트를 '필터 매칭 단위' 로 변환."""
-        units: List[MeaningfulUnit] = []
+        units: list[MeaningfulUnit] = []
         i = 0
         n = len(tokens)
         while i < n:

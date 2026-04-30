@@ -1,5 +1,5 @@
 """기본 동작 테스트."""
-from nerv_filter import ModerationAction, NervFilter, SecurityLevel
+from nerv_filter import ModerationAction, SecurityLevel
 
 
 def test_clean_text_passes(filter_default):

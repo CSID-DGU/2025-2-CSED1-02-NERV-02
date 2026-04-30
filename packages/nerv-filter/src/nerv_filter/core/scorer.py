@@ -12,7 +12,7 @@ Bucket:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from ..models import WordType
 
@@ -62,9 +62,9 @@ class RiskScorer:
 
     def execute(
         self,
-        filter_result: Dict[str, Any],
+        filter_result: dict[str, Any],
         trigger_keywords: frozenset[str] | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         triggers = trigger_keywords or frozenset()
 
         detected_words = filter_result.get("detected_words", [])
@@ -131,7 +131,7 @@ class RiskScorer:
         has_blacklist: bool,
         has_system: bool,
         has_trigger: bool,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         score_100 = max(0.0, min(score_100, 100.0))
         return {
             "score": round(score_100 / 100.0, 2),

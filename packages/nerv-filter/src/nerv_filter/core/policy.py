@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from ..models import ModerationAction, SecurityLevel, WordType
 
@@ -15,7 +15,7 @@ _CAT_GENERAL = "GENERAL"
 
 
 # 매트릭스: [보안모드][검출카테고리] → 액션
-_MATRIX: Dict[SecurityLevel, Dict[str, ModerationAction]] = {
+_MATRIX: dict[SecurityLevel, dict[str, ModerationAction]] = {
     SecurityLevel.LOW: {
         _CAT_BLACKLIST: ModerationAction.PARTIAL_MASK,
         _CAT_GENERAL_TRIGGER: ModerationAction.PARTIAL_MASK,
@@ -45,10 +45,10 @@ class PolicyManager:
 
     def decide_action(
         self,
-        scorer_result: Dict[str, Any],
-        filter_result: Dict[str, Any],
+        scorer_result: dict[str, Any],
+        filter_result: dict[str, Any],
         security_level: SecurityLevel | str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         original_text = filter_result.get("original_text", "")
         detected_words = filter_result.get("detected_words", [])
         score = scorer_result.get("score", 0.0)
@@ -86,7 +86,7 @@ class PolicyManager:
         self,
         action: ModerationAction,
         original_text: str,
-        detected_words: List[Dict[str, Any]],
+        detected_words: list[dict[str, Any]],
     ) -> str:
         if action == ModerationAction.FULL_BLOCK:
             return ""
@@ -95,7 +95,7 @@ class PolicyManager:
         return original_text
 
     @staticmethod
-    def _star_mask(text: str, detected_words: List[Dict[str, Any]]) -> str:
+    def _star_mask(text: str, detected_words: list[dict[str, Any]]) -> str:
         masked = text
         for item in detected_words:
             word = item.get("word", "")

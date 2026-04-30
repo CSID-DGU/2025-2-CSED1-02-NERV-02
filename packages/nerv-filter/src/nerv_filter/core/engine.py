@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Iterable
+from collections.abc import Iterable
 
 from ..models import (
     DetectedWord,
@@ -139,7 +139,10 @@ class NervFilter:
             self._system_words,
             self._dict_version,
         )
-        return [self._to_filter_result(t, r) for t, r in zip(texts, raw_list)]
+        return [
+            self._to_filter_result(t, r)
+            for t, r in zip(texts, raw_list, strict=False)
+        ]
 
     async def analyze_async(self, text: str) -> FilterResult:
         """비동기 래퍼 — 내부적으로 ``asyncio.to_thread`` 사용."""
