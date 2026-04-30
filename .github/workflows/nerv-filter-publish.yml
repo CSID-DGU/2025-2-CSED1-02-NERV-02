@@ -1,0 +1,65 @@
+name: nerv-filter — Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Target index (testpypi or pypi)"
+        required: true
+        default: "testpypi"
+        type: choice
+        options:
+          - testpypi
+          - pypi
+
+defaults:
+  run:
+    working-directory: packages/nerv-filter
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write    # PyPI Trusted Publishing (OIDC)
+      contents: read
+
+    environment:
+      name: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'pypi' }}
+      url: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi' && 'https://test.pypi.org/p/nerv-filter' || 'https://pypi.org/p/nerv-filter' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify version matches tag
+        if: github.event_name == 'release'
+        run: |
+          PKG_VERSION=$(python -c "exec(open('src/nerv_filter/_version.py').read()); print(__version__)")
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "Version mismatch: package=$PKG_VERSION tag=$TAG_VERSION"
+            exit 1
+          fi
+
+      - name: Build
+        run: |
+          pip install build
+          python -m build
+
+      - name: Publish to TestPyPI
+        if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: packages/nerv-filter/dist/
+
+      - name: Publish to PyPI
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/nerv-filter/dist/
