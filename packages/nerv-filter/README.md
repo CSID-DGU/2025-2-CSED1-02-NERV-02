@@ -1,5 +1,10 @@
 # nerv-filter
 
+[![PyPI version](https://img.shields.io/pypi/v/nerv-filter.svg)](https://pypi.org/project/nerv-filter/)
+[![Python](https://img.shields.io/pypi/pyversions/nerv-filter.svg)](https://pypi.org/project/nerv-filter/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Downloads](https://static.pepy.tech/badge/nerv-filter)](https://pepy.tech/project/nerv-filter)
+
 Korean profanity filter with morphological analysis (Kiwi + Aho-Corasick).
 
 > ⚠️ **Status**: Alpha — API may change before v1.0
