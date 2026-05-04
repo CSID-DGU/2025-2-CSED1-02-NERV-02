@@ -10,9 +10,15 @@ class SecondPassFilter:
     def __init__(self):
         self.models = load_all_second_pass_models()
 
-    async def execute(self, first_pass_result: dict) -> dict:
+    async def execute(self, first_pass_result: dict, enabled_modules: str = "ALL") -> dict:
         original_text = first_pass_result["original_text"]
 
+        # User가 설정한 모듈 파싱
+        if not enabled_modules or enabled_modules == "ALL":
+            enabled = {"ALL"}
+        else:
+            enabled = {m.strip().upper() for m in enabled_modules.split(",")}
+        
         try:
             ai_scores = await self._call_ai_model(original_text)
 
@@ -25,10 +31,14 @@ class SecondPassFilter:
             logger.error(f"2차 필터링 중 오류 발생: {e}", exc_info=True)
             return first_pass_result
 
-    async def _call_ai_model(self, text: str) -> dict:
+    async def _call_ai_model(self, text: str, enabled_modules: set[str]) -> dict:
         results = {}
 
         for model_type, bundle in self.models.items():
+             # User가 설정하지 않은 모델은 스킵
+            if "ALL" not in enabled_modules and model_type.value.upper() not in enabled_modules:
+                continue
+            
             inputs = bundle.tokenizer(
                 text,
                 return_tensors="pt",
