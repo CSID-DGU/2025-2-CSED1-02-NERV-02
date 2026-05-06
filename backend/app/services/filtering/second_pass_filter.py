@@ -20,7 +20,7 @@ class SecondPassFilter:
             enabled = {m.strip().upper() for m in enabled_modules.split(",")}
         
         try:
-            ai_scores = await self._call_ai_model(original_text)
+            ai_scores = await self._call_ai_model(original_text, enabled)
 
             return {
                 **first_pass_result,
@@ -38,7 +38,7 @@ class SecondPassFilter:
              # User가 설정하지 않은 모델은 스킵
             if "ALL" not in enabled_modules and model_type.value.upper() not in enabled_modules:
                 continue
-            
+                        
             inputs = bundle.tokenizer(
                 text,
                 return_tensors="pt",
