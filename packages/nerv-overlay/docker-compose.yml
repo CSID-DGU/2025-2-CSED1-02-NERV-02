@@ -1,0 +1,97 @@
+# ──────────────────────────────────────────────
+# NERV Overlay 마이크로서비스 오케스트레이션
+#
+# 시작:    docker compose up -d
+# 중지:    docker compose down
+# 로그:    docker compose logs -f
+# 완전삭제: docker compose down -v
+#
+# 포트 맵:
+#   3308 → MySQL (호스트만 접근, 다른 컨테이너는 내부 hostname)
+#   8080 → Spring Boot
+#   8001 → FastAPI filter-service
+#   8002 → FastAPI chat-fetcher (CHZZK/YouTube)
+#   5173 → React dev server (선택)
+# ──────────────────────────────────────────────
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: overlay-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "0000"
+      MYSQL_DATABASE: nerv_overlay
+    ports:
+      - "3308:3306"
+    volumes:
+      - overlay_mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  filter-service:
+    build:
+      # 로컬 nerv-filter SDK 를 참조하기 위해 packages/ 를 context 로
+      context: ..
+      dockerfile: nerv-overlay/filter-service/Dockerfile
+    container_name: overlay-filter-service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s   # Kiwi 로딩 시간
+
+  chat-fetcher:
+    build:
+      context: ./chat-fetcher
+    container_name: overlay-chat-fetcher
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      # CHZZK OpenAPI (OAuth) — 사용자별 본인 채널 채팅 구독
+      CHZZK_CLIENT_ID: ${CHZZK_CLIENT_ID:-}
+      CHZZK_CLIENT_SECRET: ${CHZZK_CLIENT_SECRET:-}
+      # YouTube
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  spring-app:
+    build:
+      context: ./spring-app
+    container_name: overlay-spring-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      filter-service:
+        condition: service_healthy
+      chat-fetcher:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: nerv_overlay
+      DB_USER: root
+      DB_PASSWORD: "0000"
+      FILTER_SERVICE_URL: http://filter-service:8001
+      CHAT_FETCHER_URL: http://chat-fetcher:8002
+      CHAT_FETCHER_WS_URL: ws://chat-fetcher:8002
+    ports:
+      - "8080:8080"
+
+volumes:
+  overlay_mysql_data:
