@@ -1,0 +1,28 @@
+# Spring / Gradle
+spring-app/.gradle/
+spring-app/build/
+spring-app/out/
+spring-app/.idea/
+spring-app/*.iml
+
+# Python
+filter-service/__pycache__/
+filter-service/*.egg-info/
+filter-service/.pytest_cache/
+filter-service/.ruff_cache/
+filter-service/.venv/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Docker
+.env
+.env.local
+
+# IDE / OS
+.vscode/
+.DS_Store
+Thumbs.db
+*.log

@@ -51,6 +51,8 @@ class PolicyManager:
     ) -> dict[str, Any]:
         original_text = filter_result.get("original_text", "")
         detected_words = filter_result.get("detected_words", [])
+        # first_pass 가 위치 기반으로 정확히 마스킹한 결과
+        precomputed_masked = filter_result.get("masked_text", original_text)
         score = scorer_result.get("score", 0.0)
 
         if not detected_words:
@@ -74,7 +76,7 @@ class PolicyManager:
         )
         action = _MATRIX[level][category]
 
-        processed_text = self._render_text(action, original_text, detected_words)
+        processed_text = self._render_text(action, original_text, precomputed_masked)
 
         return {
             "action": action,
@@ -86,12 +88,14 @@ class PolicyManager:
         self,
         action: ModerationAction,
         original_text: str,
-        detected_words: list[dict[str, Any]],
+        precomputed_masked: str,
     ) -> str:
         if action == ModerationAction.FULL_BLOCK:
             return ""
         if action == ModerationAction.PARTIAL_MASK:
-            return self._star_mask(original_text, detected_words)
+            # first_pass 가 위치 기반으로 정확히 마스킹한 결과 사용.
+            # text.replace 는 typo 보정으로 매칭된 케이스 ("씨발련" → 사전어 "씨발년") 에서 깨짐.
+            return precomputed_masked
         return original_text
 
     @staticmethod
