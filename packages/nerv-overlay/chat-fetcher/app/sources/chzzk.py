@@ -1,11 +1,10 @@
-"""치지직 채팅 어댑터 — 공식 OpenAPI Sessions/Subscribe 기반.
+"""치지직 채팅 어댑터 — chzzkpy 의 UserClient gateway 기반.
 
 흐름:
-1) GET /open/v1/sessions/auth (Bearer user access_token) → socket.io URL
-2) socket.io connect (transports=websocket)
-3) "system"/"connected" 이벤트로 sessionKey 캡처
-4) POST /open/v1/sessions/events/subscribe/chat?sessionKey=...
-5) "chat" 이벤트 마다 publish 호출
+1) Client(client_id, client_secret) 생성
+2) refresh_user_client(refresh_token) 으로 user_client 발급 (access_token 자동 refresh)
+3) on_chat 이벤트 핸들러 등록
+4) user_client.connect(UserPermission(chat=True)) 로 socket.io (EIO=3) 연결 + chat 이벤트 수신
 
 각 사용자 본인 OAuth 토큰으로 본인 채널만 구독 (CHZZK 정책).
 NID_AUT/NID_SES 비공식 쿠키 의존성 제거.
@@ -13,133 +12,99 @@ NID_AUT/NID_SES 비공식 쿠키 의존성 제거.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
+import os
 import time
 from typing import Awaitable, Callable
 
-import httpx
-import socketio
-
 logger = logging.getLogger(__name__)
-
-CHZZK_SESSIONS_AUTH = "https://openapi.chzzk.naver.com/open/v1/sessions/auth"
-CHZZK_SESSIONS_SUBSCRIBE_CHAT = "https://openapi.chzzk.naver.com/open/v1/sessions/events/subscribe/chat"
-CHZZK_SESSIONS_UNSUBSCRIBE_CHAT = "https://openapi.chzzk.naver.com/open/v1/sessions/events/unsubscribe/chat"
 
 
 class ChzzkSession:
-    def __init__(self, channel_id: str, access_token: str):
+    def __init__(self, channel_id: str, access_token: str, refresh_token: str):
         self.channel_id = channel_id
         self.access_token = access_token
-        self.sio: socketio.AsyncClient | None = None
-        self.session_key: str | None = None
-        self._connected_evt = asyncio.Event()
+        self.refresh_token = refresh_token
+        self.client = None
+        self.user_client = None
+        self.task: asyncio.Task | None = None
         self._on_message: Callable[[dict], Awaitable[None]] | None = None
 
     async def start(self, on_message: Callable[[dict], Awaitable[None]]) -> None:
+        # import here so import-time chzzkpy load 실패가 다른 source 에 영향 안 주게
+        from chzzkpy import Client, UserPermission
+
+        client_id = os.environ.get("CHZZK_CLIENT_ID")
+        client_secret = os.environ.get("CHZZK_CLIENT_SECRET")
+        if not client_id or not client_secret:
+            raise RuntimeError("CHZZK_CLIENT_ID / CHZZK_CLIENT_SECRET 환경변수 필요")
+
         self._on_message = on_message
-        url = await self._get_session_url()
+        self.client = Client(client_id, client_secret)
 
-        self.sio = socketio.AsyncClient(reconnection=False, logger=False, engineio_logger=False)
-        self._wire_handlers(self.sio)
-        await self.sio.connect(url, transports=["websocket"], wait_timeout=10)
+        @self.client.event
+        async def on_chat(message):
+            try:
+                content = getattr(message, "content", None)
+                if not content:
+                    return
+                profile = getattr(message, "profile", None)
+                nickname = getattr(profile, "nickname", "Anonymous") if profile else "Anonymous"
+                user_id = getattr(message, "user_id", "") or ""
+                created = getattr(message, "created_time", None)
+                ts_key = int(created.timestamp() * 1000) if created else int(time.time() * 1000)
 
+                normalized = {
+                    "id": f"chzzk-{ts_key}-{user_id}",
+                    "author": nickname,
+                    "content": content,
+                    "ts_received_ms": int(time.time() * 1000),
+                    "source": "chzzk",
+                    "channel_id": getattr(message, "channel", self.channel_id),
+                }
+                if self._on_message:
+                    await self._on_message(normalized)
+            except Exception as e:
+                logger.exception("[CHZZK] on_chat 핸들러 오류: %s", e)
+
+        @self.client.event
+        async def on_connect(session_id):
+            logger.info("[CHZZK] gateway connected channel=%s session=%s",
+                        self.channel_id, session_id)
+
+        # refresh_token 으로 새 access_token 받고 user_client 발급
         try:
-            await asyncio.wait_for(self._connected_evt.wait(), timeout=10)
-        except asyncio.TimeoutError as e:
-            await self.sio.disconnect()
-            raise RuntimeError("CHZZK system/connected 이벤트 시한 초과") from e
-
-        await self._subscribe_chat()
-        logger.info("[CHZZK-Session] start 완료 channel=%s sessionKey=%s",
-                    self.channel_id, self.session_key)
-
-    async def _get_session_url(self) -> str:
-        headers = {"Authorization": f"Bearer {self.access_token}"}
-        async with httpx.AsyncClient(timeout=10) as c:
-            r = await c.get(CHZZK_SESSIONS_AUTH, headers=headers)
-        if r.status_code >= 400:
-            raise RuntimeError(f"sessions/auth {r.status_code}: {r.text[:200]}")
-        body = r.json()
-        url = (body.get("content") or {}).get("url") if isinstance(body.get("content"), dict) else None
-        if not url:
-            raise RuntimeError(f"sessions/auth 응답에 url 없음: {str(body)[:200]}")
-        return url
-
-    async def _subscribe_chat(self) -> None:
-        headers = {"Authorization": f"Bearer {self.access_token}"}
-        async with httpx.AsyncClient(timeout=10) as c:
-            r = await c.post(
-                CHZZK_SESSIONS_SUBSCRIBE_CHAT,
-                headers=headers,
-                params={"sessionKey": self.session_key},
-            )
-        if r.status_code >= 400:
-            raise RuntimeError(f"subscribe/chat {r.status_code}: {r.text[:200]}")
-
-    def _wire_handlers(self, sio: socketio.AsyncClient) -> None:
-        # chzzkpy state.py 기준 이벤트 이름은 소문자(system/chat). 안전을 위해 양쪽 등록.
-        for name in ("system", "SYSTEM"):
-            sio.on(name, self._on_system)
-        for name in ("chat", "CHAT"):
-            sio.on(name, self._on_chat)
-
-    async def _on_system(self, data) -> None:
-        try:
-            payload = json.loads(data) if isinstance(data, str) else data
-            if not isinstance(payload, dict):
-                return
-            evt_type = payload.get("type")
-            evt_data = payload.get("data") or {}
-            if evt_type == "connected":
-                key = evt_data.get("sessionKey") if isinstance(evt_data, dict) else None
-                if key and not self.session_key:
-                    self.session_key = key
-                    self._connected_evt.set()
+            self.user_client = await self.client.refresh_user_client(self.refresh_token)
         except Exception as e:
-            logger.warning("[CHZZK-Session] system 파싱 실패: %s", e)
+            logger.error("[CHZZK] refresh_user_client 실패: %s", e)
+            raise
 
-    async def _on_chat(self, data) -> None:
+        # connect 는 blocking — background task 로 실행
+        self.task = asyncio.create_task(self._connect_loop(UserPermission))
+
+    async def _connect_loop(self, UserPermission) -> None:
         try:
-            payload = json.loads(data) if isinstance(data, str) else data
-            if not isinstance(payload, dict):
-                logger.debug("[CHZZK-Session] chat non-dict 페이로드: %s", str(data)[:200])
-                return
-            content = payload.get("content")
-            if not content:
-                return
-            profile = payload.get("profile") or {}
-            msg_id = f"chzzk-{payload.get('messageTime', 0)}-{payload.get('senderChannelId', '')}"
-            normalized = {
-                "id": msg_id,
-                "author": profile.get("nickname", "Anonymous"),
-                "content": content,
-                "ts_received_ms": int(time.time() * 1000),
-                "source": "chzzk",
-                "channel_id": payload.get("channelId") or self.channel_id,
-            }
-            if self._on_message:
-                await self._on_message(normalized)
+            await self.user_client.connect(UserPermission(chat=True))
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
-            logger.exception("[CHZZK-Session] chat 핸들러 오류: %s", e)
+            logger.exception("[CHZZK] connect 종료: %s", e)
 
     async def close(self) -> None:
-        # best-effort unsubscribe
-        if self.sio and self.session_key:
-            headers = {"Authorization": f"Bearer {self.access_token}"}
+        if self.task and not self.task.done():
+            self.task.cancel()
             try:
-                async with httpx.AsyncClient(timeout=5) as c:
-                    await c.post(
-                        CHZZK_SESSIONS_UNSUBSCRIBE_CHAT,
-                        headers=headers,
-                        params={"sessionKey": self.session_key},
-                    )
-            except Exception as e:
-                logger.debug("[CHZZK-Session] unsubscribe 실패(무시): %s", e)
-        if self.sio:
+                await self.task
+            except (asyncio.CancelledError, Exception):
+                pass
+        if self.user_client:
             try:
-                await self.sio.disconnect()
+                await self.user_client.disconnect()
+            except Exception:
+                pass
+        if self.client:
+            try:
+                await self.client.disconnect()
             except Exception:
                 pass
 
@@ -150,19 +115,19 @@ _active: dict[str, ChzzkSession] = {}
 def make_chzzk_factory(
     channel_id: str,
     access_token: str | None = None,
-    refresh_token: str | None = None,  # noqa: ARG001 — 향후 자동 갱신용
+    refresh_token: str | None = None,
 ):
     """ChannelHub 호환 (starter, closer) 페어 생성.
 
-    OAuth Sessions API 사용. access_token 필수 (사용자별 본인 채널만 구독 가능).
+    chzzkpy 사용. refresh_token 필수 (access_token 도 같이 받지만 갱신은 chzzkpy 가 처리).
     """
-    if not access_token:
-        raise RuntimeError("CHZZK source 에는 access_token 필요 (사용자 OAuth 인증 필요).")
+    if not refresh_token:
+        raise RuntimeError("CHZZK source 에는 refresh_token 필요 (사용자 OAuth 인증 필요).")
 
     async def starter(channel_id_in: str, publish: Callable[[dict], Awaitable[None]]) -> None:
         if channel_id_in in _active:
             return
-        sess = ChzzkSession(channel_id_in, access_token)
+        sess = ChzzkSession(channel_id_in, access_token or "", refresh_token)
         _active[channel_id_in] = sess
         try:
             await sess.start(publish)

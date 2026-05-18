@@ -41,7 +41,7 @@
 1. Railway 대시보드 → **New Project** → **Empty Project**
 2. 프로젝트 안에서 **+ New** → **Database** → **Add MySQL**
 3. MySQL 생성 후 `Variables` 탭에서 다음 값들이 자동 생성된 것 확인:
-   - `MYSQL_HOST` `MYSQL_PORT` `MYSQL_DATABASE` `MYSQL_USER` `MYSQL_PASSWORD`
+   - `MYSQLHOST` `MYSQLPORT` `MYSQLDATABASE` `MYSQLUSER` `MYSQLPASSWORD` (Railway 버전에 따라 underscore 있을 수도 — `MYSQL_HOST` 등. 어느 쪽이든 그대로 사용)
    - `MYSQL_URL` (`mysql://...` 형태)
 
 ### 1-2. spring-app 서비스 추가
@@ -54,11 +54,11 @@
 
    | Key | Value |
    |---|---|
-   | `DB_HOST` | `${{MySQL.MYSQL_HOST}}` |
-   | `DB_PORT` | `${{MySQL.MYSQL_PORT}}` |
-   | `DB_NAME` | `${{MySQL.MYSQL_DATABASE}}` |
-   | `DB_USER` | `${{MySQL.MYSQL_USER}}` |
-   | `DB_PASSWORD` | `${{MySQL.MYSQL_PASSWORD}}` |
+   | `DB_HOST` | `${{MySQL.MYSQLHOST}}` (또는 `MYSQL_HOST` — 본인 변수명) |
+   | `DB_PORT` | `${{MySQL.MYSQLPORT}}` |
+   | `DB_NAME` | `${{MySQL.MYSQLDATABASE}}` |
+   | `DB_USER` | `${{MySQL.MYSQLUSER}}` |
+   | `DB_PASSWORD` | `${{MySQL.MYSQLPASSWORD}}` |
    | `JWT_SECRET` | (랜덤 32자 이상, 예: `openssl rand -base64 48` 결과) |
    | `PUBLIC_BASE_URL` | `https://nerv-spring.up.railway.app` (자기 도메인) |
    | `FRONTEND_BASE_URL` | `https://nerv-app.vercel.app` (Vercel 도메인 — Step 2 후 입력) |
@@ -138,11 +138,11 @@ https://nerv-spring.up.railway.app/api/oauth/chzzk/callback
 
 ### Railway: spring-app
 ```env
-DB_HOST=${{MySQL.MYSQL_HOST}}
-DB_PORT=${{MySQL.MYSQL_PORT}}
-DB_NAME=${{MySQL.MYSQL_DATABASE}}
-DB_USER=${{MySQL.MYSQL_USER}}
-DB_PASSWORD=${{MySQL.MYSQL_PASSWORD}}
+DB_HOST=${{MySQL.MYSQLHOST}}
+DB_PORT=${{MySQL.MYSQLPORT}}
+DB_NAME=${{MySQL.MYSQLDATABASE}}
+DB_USER=${{MySQL.MYSQLUSER}}
+DB_PASSWORD=${{MySQL.MYSQLPASSWORD}}
 JWT_SECRET=<랜덤 32자 이상>
 PUBLIC_BASE_URL=https://<spring-domain>.up.railway.app
 FRONTEND_BASE_URL=https://<vercel-domain>.vercel.app
