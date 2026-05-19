@@ -10,3 +10,5 @@ env/
 
 .vscode/
 .idea/
+
+data/active_learning
