@@ -27,6 +27,7 @@ class FilterResult(BaseModel):
     masked_text: str = Field(..., description="1차 마스킹 완료된 텍스트", json_schema_extra={
         "example": "야이 __F__야 ㅋㅋ 니네 집 주소 다 털었다 010-1234-5678 밤길 조심해라"
     })
+    second_pass_scores: dict[str, float] | None = None
 
 # [위험도 계산 및 정책 모델]
 
@@ -63,3 +64,4 @@ class TextAnalysisResponse(BaseModel):
     score: float
     details: FilterResult
     flags: ScorerFlags
+    ai_modules: list[str] = Field(default_factory=list)

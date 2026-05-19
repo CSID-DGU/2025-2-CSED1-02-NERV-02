@@ -175,6 +175,7 @@ export const useFullAnalysis = (
           score: textResults[i].score,
           detected_words: textResults[i].details.detected_words,
           flags: textResults[i].flags,
+          ai_modules: textResults[i].ai_modules ?? [],
         } satisfies AnalyzedComment)),
       };
 

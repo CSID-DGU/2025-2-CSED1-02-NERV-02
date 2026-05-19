@@ -22,6 +22,12 @@ const MATRIX: Record<SecurityLevel, Record<Category, ModerationAction>> = {
   },
 };
 
+const AI_MATRIX: Record<SecurityLevel, ModerationAction> = {
+  LOW: 'REVIEW',
+  MEDIUM: 'FULL_BLOCK',
+  HIGH: 'FULL_BLOCK',
+};
+
 export interface DerivedDecision {
   action: ModerationAction;
   processed_text: string;
@@ -37,15 +43,22 @@ const applySecurityAdjustment = (
   comment: AnalyzedComment,
   securityLevel: SecurityLevel,
 ): number => {
-  if (!comment.detected_words.length) {
+  const hasAiModules = (comment.ai_modules ?? []).length > 0;
+
+  if (!comment.detected_words.length && !hasAiModules) {
     return baseScore;
   }
+
   let bonus = 0;
-  if (comment.flags.has_blacklist) {
+
+  if (hasAiModules) {
+    if (securityLevel === 'HIGH') bonus = 0.25;
+  } else if (comment.flags.has_blacklist) {
     if (securityLevel === 'MEDIUM' || securityLevel === 'HIGH') bonus = 0.25;
   } else if (comment.flags.has_general) {
     if (securityLevel === 'MEDIUM' || securityLevel === 'HIGH') bonus = 0.25;
   }
+
   return Math.min(1.0, baseScore + bonus);
 };
 
@@ -54,7 +67,20 @@ export const derivePolicy = (
   securityLevel: SecurityLevel,
 ): DerivedDecision => {
   const score = applySecurityAdjustment(comment.score, comment, securityLevel);
+  const hasAiModules = (comment.ai_modules ?? []).length > 0;
 
+  // 2차 AI 탐지 결과
+  // AI는 특정 단어 위치를 모르므로 PARTIAL_MASK를 사용하지 않는다.
+  if (hasAiModules) {
+    const action = AI_MATRIX[securityLevel];
+
+    return {
+      action,
+      processed_text: action === 'FULL_BLOCK' ? '' : comment.text,
+      score,
+    };
+  }
+  
   if (!comment.detected_words.length) {
     return { action: 'NORMAL', processed_text: comment.text, score };
   }

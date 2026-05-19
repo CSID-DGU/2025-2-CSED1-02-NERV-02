@@ -42,13 +42,12 @@ const ModuleTab = () => {
   const currentInfo = LEVEL_INFO[settings.intensity] ?? LEVEL_INFO.MEDIUM;
 
   const moduleList = [
-    { key: 'aggression', label: '악성 비난/협박', desc: '특정 대상에 대한 맹목적 비난, 살해 협박, 저주 등을 탐지합니다.' },
+    { key: 'criticism', label: '악성 비난/협박', desc: '특정 대상에 대한 맹목적 비난, 협박, 저주 등을 탐지합니다.' },
     { key: 'sexual', label: '성희롱/음란물', desc: '성적 수치심을 유발하거나 음란한 묘사가 포함된 댓글을 탐지합니다.' },
-    { key: 'family', label: '패륜/가족 비하', desc: '부모, 자녀 등 가족을 비하하거나 모욕하는 패륜적 발언을 탐지합니다.' },
-    { key: 'privacy', label: '개인정보 유출', desc: '전화번호, 주소, 실명, 계좌번호 등 개인정보가 포함된 댓글을 차단합니다.' },
-    { key: 'political', label: '정치/혐오 발언', desc: '영상 맥락과 무관한 정치적 선동이나 혐오 발언을 필터링합니다.' },
+    { key: 'pii', label: '개인정보 유출', desc: '전화번호, 주소, 실명, 계좌번호 등 개인정보가 포함된 댓글을 탐지합니다.' },
+    { key: 'politics', label: '정치/혐오 발언', desc: '영상 맥락과 무관한 정치적 선동이나 혐오 발언을 필터링합니다.' },
     { key: 'spam', label: '스팸/도배/광고', desc: '광고성 링크, 도배, 무의미한 문자열 반복 등을 탐지합니다.' },
-    { key: 'modified', label: '필터 회피/변형 시도', desc: '자음/모음 분리(예: ㅂㅅ), 특수문자 삽입, 야민정음 등 필터링 회피 시도를 잡아냅니다.' },
+    { key: 'basic', label: '기본 유해/필터 회피', desc: '일반 유해 표현, 변형 표현, 필터 회피 시도를 탐지합니다.' },
   ] as const;
 
   return (

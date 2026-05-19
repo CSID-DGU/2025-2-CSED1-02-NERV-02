@@ -16,7 +16,7 @@ class User(Base):
 
     ai_soften_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     use_detail_ai_model: Mapped[bool] = mapped_column(Boolean, default=False)
-    enabled_modules: Mapped[str] = mapped_column(String(255), default="ALL")
+    enabled_modules: Mapped[str] = mapped_column(String(255), default="spam,pii,politics,criticism,basic,sexual")
 
     youtube_channel_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
     youtube_channel_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -55,7 +55,7 @@ class VideoAnalysisCache(Base):
     max_pages: Mapped[int] = mapped_column(Integer, default=1)
     security_level: Mapped[str] = mapped_column(String(10))
     ai_soften_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
-    enabled_modules: Mapped[str] = mapped_column(String(255), default="ALL")
+    enabled_modules: Mapped[str] = mapped_column(String(255), default="spam,pii,politics,criticism,basic,sexual")
     payload_json: Mapped[str] = mapped_column(Text)
     analyzed_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
@@ -82,7 +82,7 @@ class CommentAnalysisCache(Base):
     comment_id: Mapped[str] = mapped_column(String(128), index=True)
     security_level: Mapped[str] = mapped_column(String(10))
     ai_soften_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
-    enabled_modules: Mapped[str] = mapped_column(String(255), default="ALL")
+    enabled_modules: Mapped[str] = mapped_column(String(255), default="spam,pii,politics,criticism,basic,sexual")
     payload_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())

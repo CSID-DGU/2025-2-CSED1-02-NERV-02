@@ -10,7 +10,14 @@ logger = logging.getLogger(__name__)
 _CAT_BLACKLIST = "BLACKLIST"
 _CAT_GENERAL_TRIGGER = "GENERAL_TRIGGER"
 _CAT_GENERAL = "GENERAL"
-
+_AI_THRESHOLDS = {
+    "spam": 0.8,
+    "pii": 0.8,
+    "politics": 0.8,
+    "criticism": 0.8,
+    "basic": 0.8,
+    "sexual": 0.8,
+}
 
 # 매트릭스: [보안모드][검출카테고리] → 액션
 _MATRIX: Dict[SecurityLevel, Dict[str, ModerationAction]] = {
@@ -31,6 +38,11 @@ _MATRIX: Dict[SecurityLevel, Dict[str, ModerationAction]] = {
     },
 }
 
+_AI_MATRIX: Dict[SecurityLevel, ModerationAction] = {
+    SecurityLevel.LOW: ModerationAction.REVIEW,
+    SecurityLevel.MEDIUM: ModerationAction.REVIEW,
+    SecurityLevel.HIGH: ModerationAction.FULL_BLOCK,
+}
 
 class PolicyManager:
     def __init__(self):
@@ -47,14 +59,34 @@ class PolicyManager:
         detected_words = filter_result.get("detected_words", [])
         score = scorer_result.get("score", 0.0)
 
+        level = (
+            security_level
+            if isinstance(security_level, SecurityLevel)
+            else SecurityLevel(security_level)
+        )
+
+        # 0. 2차 AI 탐지 결과가 있는 경우
+        if scorer_result.get("is_ai_detected"):
+            action = _AI_MATRIX[level]
+
+            processed_text = (""if action == ModerationAction.FULL_BLOCK else original_text)
+
+            return {
+                "action": action,
+                "processed_text": processed_text,
+                "score": score,
+                "ai_modules": scorer_result.get("ai_modules", []),
+            }
+
         # 1. 검출 없음 → NORMAL
         if not detected_words:
             return {
                 "action": ModerationAction.NORMAL,
                 "processed_text": original_text,
                 "score": score,
+                "ai_modules": [],
             }
-
+        
         # 2. 카테고리 결정 (우선순위: 블랙리스트 > 트리거 > 일반)
         # detected_words 가 존재하면 반드시 어딘가에 분류된다 — 플래그가 모두
         # false 로 돌아오는 엣지케이스(신규 WordType 등)는 일반(GENERAL) 로 폴백.
@@ -76,6 +108,7 @@ class PolicyManager:
             "action": action,
             "processed_text": processed_text,
             "score": score,
+            "ai_modules": [],
         }
 
     def _render_text(

@@ -9,7 +9,7 @@ class UserSettingsUpdate(BaseModel):
     security_level: Optional[SecurityLevel] = Field(None, description="보안 모드 (LOW/MEDIUM/HIGH)")
     ai_soften_enabled: Optional[bool] = Field(None, description="AI 순화 마스킹 사용 여부")
     use_detail_ai_model: Optional[bool] = Field(None, description="2차 정밀 AI 모델 사용 여부")
-    enabled_modules: Optional[str] = Field(None, description="활성화 모듈 콤마 구분 (예: 'SEXUAL,PRIVACY' 또는 'ALL')")
+    enabled_modules: Optional[str] = Field(None, description="활성화 AI 모듈 콤마 구분 예: 'spam,pii,sexual'. 빈 문자열이면 AI 모듈 비활성화")
     youtube_channel_id: Optional[str] = Field(None, description="YouTube 채널 ID")
     youtube_channel_name: Optional[str] = Field(None, description="YouTube 채널 이름")
     youtube_channel_url: Optional[str] = Field(None, description="YouTube 채널 URL")

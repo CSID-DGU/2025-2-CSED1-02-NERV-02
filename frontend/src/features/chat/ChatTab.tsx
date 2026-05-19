@@ -62,6 +62,15 @@ interface CommentRowProps {
   onToggleReplies?: () => void;
 }
 
+const AI_MODULE_LABELS: Record<string, string> = {
+  spam: '스팸',
+  pii: '개인정보',
+  politics: '정치',
+  criticism: '비난/협박',
+  basic: '기본 유해',
+  sexual: '성적',
+};
+
 const CommentRow = ({
   comment,
   action,
@@ -78,7 +87,9 @@ const CommentRow = ({
   const isPartialMask = action === 'PARTIAL_MASK';
   const isReview = action === 'REVIEW';
   const isUserBlacklist = comment.detected_words.some(d => d.type === 'USER_BLACKLIST');
-
+  const aiModules = comment.ai_modules ?? [];
+  const hasAiModules = aiModules.length > 0;
+  
   return (
     <div className={`flex items-start space-x-3 p-2 rounded-lg transition-colors ${style.bg}`}>
       <div className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-white font-bold text-xs ${style.avatar}`}>
@@ -105,7 +116,9 @@ const CommentRow = ({
                 <span className="mr-1">🚫</span>
                 {isUserBlacklist
                   ? '사용자 블랙리스트 단어가 포함되어 숨겨졌습니다.'
-                  : '필터링된 댓글입니다.'}
+                  : hasAiModules
+                    ? 'AI 필터에 의해 숨겨진 댓글입니다.'
+                    : '필터링된 댓글입니다.'}
               </span>
             )
           ) : isPartialMask ? (
@@ -141,6 +154,19 @@ const CommentRow = ({
               />
             </div>
             <span className="text-[10px] text-gray-400">{displayScore.toFixed(2)}</span>
+          </div>
+        )}
+
+        {hasAiModules && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {aiModules.map((module) => (
+              <span
+                key={module}
+                className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium"
+              >
+                AI 감지: {AI_MODULE_LABELS[module] ?? module}
+              </span>
+            ))}
           </div>
         )}
 

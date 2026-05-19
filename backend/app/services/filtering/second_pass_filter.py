@@ -14,10 +14,10 @@ class SecondPassFilter:
         original_text = first_pass_result["original_text"]
 
         # User가 설정한 모듈 파싱
-        if not enabled_modules or enabled_modules == "ALL":
-            enabled = {"ALL"}
+        if not enabled_modules:
+            enabled = set()
         else:
-            enabled = {m.strip().upper() for m in enabled_modules.split(",")}
+            enabled = {m.strip().lower() for m in enabled_modules.split(",") if m.strip()}
         
         try:
             ai_scores = await self._call_ai_model(original_text, enabled)
@@ -34,9 +34,12 @@ class SecondPassFilter:
     async def _call_ai_model(self, text: str, enabled_modules: set[str]) -> dict:
         results = {}
 
+        if not enabled_modules:
+            return results
+        
         for model_type, bundle in self.models.items():
              # User가 설정하지 않은 모델은 스킵
-            if "ALL" not in enabled_modules and model_type.value.upper() not in enabled_modules:
+            if model_type.value not in enabled_modules:
                 continue
                         
             inputs = bundle.tokenizer(

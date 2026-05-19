@@ -34,6 +34,14 @@ _HANGUL_VOWEL_END = 0x3163        # ㅣ
 _HANGUL_SYLLABLE_START = 0xAC00   # 가
 _HANGUL_SYLLABLE_END = 0xD7A3     # 힣
 
+_AI_THRESHOLDS = {
+    "spam": 0.8,
+    "pii": 0.8,
+    "politics": 0.8,
+    "criticism": 0.8,
+    "basic": 0.8,
+    "sexual": 0.8,
+}
 
 def _is_standalone_consonant(ch: str) -> bool:
     return _HANGUL_CONSONANT_START <= ord(ch) <= _HANGUL_CONSONANT_END
@@ -73,7 +81,13 @@ class RiskScorer:
 
         detected_words = filter_result.get("detected_words", [])
         original_text = filter_result.get("original_text", "")
-
+        second_pass_scores = filter_result.get("second_pass_scores") or {}
+        ai_exceeded = {
+            module: float(score)
+            for module, score in second_pass_scores.items()
+            if float(score) >= _AI_THRESHOLDS.get(module, 0.8)
+        }
+        
         has_blacklist = any(
             item["type"] == WordType.USER_BLACKLIST for item in detected_words
         )
@@ -86,6 +100,13 @@ class RiskScorer:
 
         non_space_len = sum(1 for c in original_text if not c.isspace())
 
+        # ── AI: AI 검출 있음 ──
+        if not detected_words and ai_exceeded:
+            ai_avg_score = sum(ai_exceeded.values()) / len(ai_exceeded)
+            score_100 = ai_avg_score * 100.0
+
+            return self._pack(score_100, False, True, False, list(ai_exceeded.keys()), True)
+        
         # ── Normal: 검출 없음 ──
         if not detected_words:
             score_100 = self._normal_bucket(original_text, non_space_len)
@@ -145,6 +166,8 @@ class RiskScorer:
         has_blacklist: bool,
         has_system: bool,
         has_trigger: bool,
+        ai_modules: list[str] | None = None,
+        is_ai_detected: bool = False,
     ) -> Dict[str, Any]:
         score_100 = max(0.0, min(score_100, 100.0))
         return {
@@ -152,4 +175,6 @@ class RiskScorer:
             "has_blacklist": has_blacklist,
             "has_general": has_system,
             "has_trigger": has_trigger,
+            "ai_modules": ai_modules or [],
+            "is_ai_detected": is_ai_detected,
         }
