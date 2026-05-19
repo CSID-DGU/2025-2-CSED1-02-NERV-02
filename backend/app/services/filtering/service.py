@@ -6,6 +6,7 @@ from .second_pass_filter import SecondPassFilter
 from .risk_scorer import RiskScorer
 from .policy_manager import PolicyManager
 from .context import VideoContext
+from app.services.active_learning_collector import ActiveLearningCollector
 from app.schemas import FilterResult, TextAnalysisResponse, ScorerFlags
 from app.schemas.enums import SecurityLevel
 
@@ -26,6 +27,7 @@ class TextAnalysisService:
         self.scorer = scorer
         self.policy = policy
         self.dict_repo = dict_repo
+        self.al_collector = ActiveLearningCollector()
 
     def _build_response(
         self,
@@ -87,7 +89,11 @@ class TextAnalysisService:
         filter_result = self.first_pass.execute(
             text, effective_whitelist, effective_blacklist, effective_system_dict, dict_version
         )
-        filter_result = await self.second_pass.execute(filter_result)
+
+        scorer_result = self.scorer.execute(filter_result, ctx)
+        if self._should_run_second_pass(user, scorer_result):
+            filter_result = await self.second_pass.execute(filter_result, enabled_modules=user.enabled_modules)
+            await self.al_collector.collect(user=user, filter_result=filter_result)
         return self._build_response(user, text, filter_result, ctx)
 
     async def analyze_texts(
@@ -105,12 +111,31 @@ class TextAnalysisService:
             texts, effective_whitelist, effective_blacklist, effective_system_dict, dict_version
         )
 
-        second_pass_results = [
-            await self.second_pass.execute(fr)
-            for fr in filter_results
-        ]
-        
+        second_pass_results = []
+
+        for fr in filter_results:
+            scorer_result = self.scorer.execute(fr, ctx)
+
+            if self._should_run_second_pass(user, scorer_result):
+                fr = await self.second_pass.execute(fr, enabled_modules=user.enabled_modules)
+
+            await self.al_collector.collect(user=user, filter_result=fr)
+
+            second_pass_results.append(fr)
+
         return [
             self._build_response(user, text, fr, ctx)
             for text, fr in zip(texts, second_pass_results)
         ]
+
+    def _should_run_second_pass(self, user: User, scorer_result: dict) -> bool:
+        if not user.use_detail_ai_model:
+            return False
+
+        if scorer_result.get("has_blacklist"):
+            return False
+
+        if scorer_result.get("has_trigger"):
+            return False
+        
+        return True
