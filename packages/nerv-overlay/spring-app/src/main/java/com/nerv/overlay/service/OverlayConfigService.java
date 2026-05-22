@@ -117,7 +117,7 @@ public class OverlayConfigService {
 
     /** ownerUserId 만 다른 컨트롤러에서 직접 갱신할 때 사용 (예: 치지직 연동 시 채널/소스 자동 세팅). */
     @Transactional
-    public OverlayConfigDto applyChzzkConnection(Long userId, String channelId) {
+    public OverlayConfigDto applyChzzkConnection(Long userId, String channelId, String channelName) {
         OverlayConfig entity = repository.findFirstByOwnerUserId(userId)
                 .orElseGet(() -> {
                     OverlayConfigDto created = getOrCreateActive(userId);
@@ -125,7 +125,9 @@ public class OverlayConfigService {
                 });
         entity.setSource("CHZZK");
         entity.setChannelId(channelId);
-        log.info("[OverlayConfig] 치지직 연동 적용: userId={} channelId={}", userId, channelId);
+        entity.setChannelName(channelName);
+        log.info("[OverlayConfig] 치지직 연동 적용: userId={} channelId={} channelName={}",
+                userId, channelId, channelName);
         return OverlayConfigDto.from(entity, publicBaseUrl);
     }
 
@@ -136,6 +138,7 @@ public class OverlayConfigService {
                 .orElseThrow(() -> new IllegalArgumentException("오버레이가 없습니다."));
         entity.setSource("DUMMY");
         entity.setChannelId(null);
+        entity.setChannelName(null);
         log.info("[OverlayConfig] 치지직 연동 해제: userId={}", userId);
         return OverlayConfigDto.from(entity, publicBaseUrl);
     }

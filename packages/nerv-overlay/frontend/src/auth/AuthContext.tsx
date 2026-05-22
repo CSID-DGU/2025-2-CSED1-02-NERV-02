@@ -45,6 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     authStorage.clear()
     setUser(null)
+    // 연동 상태·캐시된 query 가 즉각 반영되도록 홈으로 이동 + 1회 새로고침
+    window.location.href = '/'
   }, [])
 
   return (
