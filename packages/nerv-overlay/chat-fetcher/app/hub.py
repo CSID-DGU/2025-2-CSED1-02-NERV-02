@@ -23,6 +23,8 @@ class ChannelHub:
     queues: list[asyncio.Queue] = field(default_factory=list)
     starter: Callable[[str, Callable[[dict], Awaitable[None]]], Awaitable[None]] | None = None
     closer: Callable[[], Awaitable[None]] | None = None
+    # starter 가 실패하면 호출 — registry 가 이 hub 를 캐시에서 제거 (stale 토큰 방지)
+    on_failure: Callable[[], Awaitable[None]] | None = None
     _started: bool = False
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
@@ -59,6 +61,14 @@ class ChannelHub:
             logger.info("[Hub] started external connection for channel=%s", self.channel_id)
         except Exception as e:
             logger.exception("[Hub] start failed for channel=%s: %s", self.channel_id, e)
+            # 실패한 hub 는 stale (옛 토큰 클로저). 캐시에서 제거해 다음 연결이
+            # 새 starter(새 토큰)로 hub 를 재생성하도록 한다.
+            self._started = False
+            if self.on_failure is not None:
+                try:
+                    await self.on_failure()
+                except Exception:
+                    logger.exception("[Hub] on_failure cleanup failed channel=%s", self.channel_id)
 
     async def _safe_close(self) -> None:
         try:
@@ -91,8 +101,14 @@ class HubRegistry:
             if hub is None:
                 starter, closer = starter_factory()
                 hub = ChannelHub(channel_id=channel_id, starter=starter, closer=closer)
+                hub.on_failure = lambda k=key: self._remove(k)
                 self._hubs[key] = hub
             return hub
+
+    async def _remove(self, key: tuple[str, str]) -> None:
+        async with self._lock:
+            self._hubs.pop(key, None)
+        logger.info("[Hub] removed stale hub %s", key)
 
     @asynccontextmanager
     async def subscribe(
