@@ -117,6 +117,7 @@ export function MainPage() {
             onRendered={markRendered}
             blockMode={config.block_display_mode}
             placeholder={config.placeholder_text}
+            showScore={config.show_score}
           />
           {isDummyMode && <ChatInputBar />}
         </section>
@@ -139,9 +140,10 @@ interface ChatListProps {
   onRendered: (id: string) => void
   blockMode: string
   placeholder: string
+  showScore: boolean
 }
 
-function ChatList({ messages, onRendered, blockMode, placeholder }: ChatListProps) {
+function ChatList({ messages, onRendered, blockMode, placeholder, showScore }: ChatListProps) {
   const listRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
 
@@ -170,6 +172,7 @@ function ChatList({ messages, onRendered, blockMode, placeholder }: ChatListProp
           onRendered={() => onRendered(m.id)}
           blockMode={blockMode}
           placeholder={placeholder}
+          showScore={showScore}
         />
       ))}
     </div>
@@ -181,9 +184,10 @@ interface ChatLineProps {
   onRendered: () => void
   blockMode: string
   placeholder: string
+  showScore: boolean
 }
 
-function ChatLine({ msg, onRendered, blockMode, placeholder }: ChatLineProps) {
+function ChatLine({ msg, onRendered, blockMode, placeholder, showScore }: ChatLineProps) {
   const reportedRef = useRef(false)
   useEffect(() => {
     if (reportedRef.current) return
@@ -198,7 +202,12 @@ function ChatLine({ msg, onRendered, blockMode, placeholder }: ChatLineProps) {
 
   return (
     <div className={className}>
-      <div className="chat-line-author">{msg.author}</div>
+      <div className="chat-line-author">
+        {msg.author}
+        {showScore && (
+          <span className="chat-line-score">위험도 {Math.round(msg.score * 100)}</span>
+        )}
+      </div>
       <div className="chat-line-text">{display}</div>
       {msg.detected_words.length > 0 && (
         <div className="chat-line-detected">

@@ -34,6 +34,7 @@ export function OverlayPage() {
             msg={m}
             mode={config.block_display_mode}
             placeholder={config.placeholder_text}
+            showScore={config.show_score}
             onRendered={() => markRendered(m.id)}
           />
         ))}
@@ -46,10 +47,11 @@ interface ChatLineProps {
   msg: ChatMessage
   mode: string
   placeholder: string
+  showScore: boolean
   onRendered: () => void
 }
 
-function ChatLine({ msg, mode, placeholder, onRendered }: ChatLineProps) {
+function ChatLine({ msg, mode, placeholder, showScore, onRendered }: ChatLineProps) {
   const reportedRef = useRef(false)
 
   useEffect(() => {
@@ -64,7 +66,12 @@ function ChatLine({ msg, mode, placeholder, onRendered }: ChatLineProps) {
   const className = `chat-line action-${msg.action.toLowerCase()}`
   return (
     <div className={className}>
-      <div className="chat-line-author">{msg.author}</div>
+      <div className="chat-line-author">
+        {msg.author}
+        {showScore && (
+          <span className="chat-line-score">위험도 {Math.round(msg.score * 100)}</span>
+        )}
+      </div>
       <div className="chat-line-text">{display}</div>
     </div>
   )
