@@ -10,3 +10,6 @@ env/
 
 .vscode/
 .idea/
+
+.claude/
+docs/

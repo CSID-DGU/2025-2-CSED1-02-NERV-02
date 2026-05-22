@@ -72,72 +72,86 @@ export function SettingsPage() {
       </header>
 
       <form onSubmit={onSubmit} className="config-form">
-        <fieldset>
-          <legend>필터 정책</legend>
+        {/* ── 섹션 1: 필터 정책 ── */}
+        <section className="settings-section">
+          <h2 className="section-title">필터 정책</h2>
+          <p className="section-desc">필터링 강도와 차단된 메시지를 어떻게 보여줄지 설정합니다.</p>
 
-          <label>
-            <span>보안 강도</span>
-            <select
-              value={form.security_level}
-              onChange={(e) => setForm({ ...form, security_level: e.target.value as SecurityLevel })}
-            >
-              <option value="LOW">LOW (관대)</option>
-              <option value="MEDIUM">MEDIUM (기본)</option>
-              <option value="HIGH">HIGH (엄격)</option>
-            </select>
-          </label>
-
-          <label>
-            <span>차단 표시 방식</span>
-            <select
-              value={form.block_display_mode}
-              onChange={(e) => setForm({ ...form, block_display_mode: e.target.value as BlockDisplayMode })}
-            >
-              <option value="MASK">MASK (별표)</option>
-              <option value="HIDE">HIDE (완전 숨김)</option>
-              <option value="PLACEHOLDER">PLACEHOLDER (대체 문구)</option>
-            </select>
-          </label>
-
-          {form.block_display_mode === 'PLACEHOLDER' && (
+          <div className="settings-fields">
             <label>
-              <span>대체 문구</span>
-              <input
-                type="text"
-                value={form.placeholder_text}
-                onChange={(e) => setForm({ ...form, placeholder_text: e.target.value })}
-                maxLength={50}
-              />
+              <span>보안 강도</span>
+              <select
+                value={form.security_level}
+                onChange={(e) => setForm({ ...form, security_level: e.target.value as SecurityLevel })}
+              >
+                <option value="LOW">LOW (관대)</option>
+                <option value="MEDIUM">MEDIUM (기본)</option>
+                <option value="HIGH">HIGH (엄격)</option>
+              </select>
             </label>
-          )}
 
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={form.show_score}
-              onChange={(e) => setForm({ ...form, show_score: e.target.checked })}
+            <label>
+              <span>차단 표시 방식</span>
+              <select
+                value={form.block_display_mode}
+                onChange={(e) => setForm({ ...form, block_display_mode: e.target.value as BlockDisplayMode })}
+              >
+                <option value="MASK">MASK (별표)</option>
+                <option value="HIDE">HIDE (완전 숨김)</option>
+                <option value="PLACEHOLDER">PLACEHOLDER (대체 문구)</option>
+              </select>
+            </label>
+
+            {form.block_display_mode === 'PLACEHOLDER' && (
+              <label>
+                <span>대체 문구</span>
+                <input
+                  type="text"
+                  value={form.placeholder_text}
+                  onChange={(e) => setForm({ ...form, placeholder_text: e.target.value })}
+                  maxLength={50}
+                />
+              </label>
+            )}
+
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={form.show_score}
+                onChange={(e) => setForm({ ...form, show_score: e.target.checked })}
+              />
+              <span>위험도 점수 표시</span>
+            </label>
+          </div>
+        </section>
+
+        {/* ── 섹션 2: 사용자 사전 설정 ── */}
+        <section className="settings-section">
+          <h2 className="section-title">사용자 사전 설정</h2>
+          <p className="section-desc">기본 사전 외에 직접 단어를 추가합니다.</p>
+
+          <div className="dict-group">
+            <h3 className="dict-subtitle">
+              화이트리스트 <span>절대 차단되지 않을 단어</span>
+            </h3>
+            <WordListEditor
+              words={form.whitelist}
+              onChange={(words) => setForm({ ...form, whitelist: words })}
+              placeholder="예: 시바견"
             />
-            <span>위험도 점수 표시</span>
-          </label>
-        </fieldset>
+          </div>
 
-        <fieldset>
-          <legend>화이트리스트 (절대 차단되지 않을 단어)</legend>
-          <WordListEditor
-            words={form.whitelist}
-            onChange={(words) => setForm({ ...form, whitelist: words })}
-            placeholder="예: 시바견"
-          />
-        </fieldset>
-
-        <fieldset>
-          <legend>블랙리스트 (무조건 차단할 단어)</legend>
-          <WordListEditor
-            words={form.blacklist}
-            onChange={(words) => setForm({ ...form, blacklist: words })}
-            placeholder="예: 특정닉네임"
-          />
-        </fieldset>
+          <div className="dict-group">
+            <h3 className="dict-subtitle">
+              블랙리스트 <span>무조건 차단할 단어</span>
+            </h3>
+            <WordListEditor
+              words={form.blacklist}
+              onChange={(words) => setForm({ ...form, blacklist: words })}
+              placeholder="예: 특정닉네임"
+            />
+          </div>
+        </section>
 
         <div className="form-actions" style={{ alignItems: 'center', gap: 12 }}>
           {savedAt && (
@@ -155,9 +169,10 @@ export function SettingsPage() {
         )}
       </form>
 
+      {/* ── 섹션 3: OBS Browser Source URL ── */}
       {existing && (
-        <section className="overlay-url-section">
-          <h2>OBS Browser Source URL</h2>
+        <section className="settings-section overlay-url-section">
+          <h2 className="section-title">OBS Browser Source URL</h2>
           <div className="url-row">
             <code>{existing.overlay_url}</code>
             <button

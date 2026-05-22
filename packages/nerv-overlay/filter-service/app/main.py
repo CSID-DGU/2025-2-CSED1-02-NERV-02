@@ -53,11 +53,15 @@ app = FastAPI(
 class AnalyzeRequest(BaseModel):
     text: str = Field(..., description="분석할 텍스트")
     security_level: SecurityLevel = Field(SecurityLevel.MEDIUM, description="정책 강도")
+    whitelist: list[str] | None = Field(None, description="요청별 화이트리스트 override")
+    blacklist: list[str] | None = Field(None, description="요청별 블랙리스트 override")
 
 
 class BatchRequest(BaseModel):
     texts: list[str]
     security_level: SecurityLevel = SecurityLevel.MEDIUM
+    whitelist: list[str] | None = None
+    blacklist: list[str] | None = None
 
 
 class DetectedWordOut(BaseModel):
@@ -136,7 +140,7 @@ async def analyze(
     if req.security_level != flt.security_level:
         flt.security_level = req.security_level
 
-    result = flt.analyze(req.text)
+    result = flt.analyze(req.text, whitelist=req.whitelist, blacklist=req.blacklist)
     return _to_response(result)
 
 
@@ -148,5 +152,5 @@ async def analyze_batch(
     if req.security_level != flt.security_level:
         flt.security_level = req.security_level
 
-    results = flt.analyze_batch(req.texts)
+    results = flt.analyze_batch(req.texts, whitelist=req.whitelist, blacklist=req.blacklist)
     return [_to_response(r) for r in results]
