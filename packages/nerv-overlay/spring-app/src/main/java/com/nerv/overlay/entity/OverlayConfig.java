@@ -39,6 +39,10 @@ public class OverlayConfig {
     @Column(name = "channel_id", length = 100)
     private String channelId;
 
+    /** 치지직 채널 표시명 (UI 노출용). channelId 와 별개. */
+    @Column(name = "channel_name", length = 100)
+    private String channelName;
+
     @Column(nullable = false, length = 20)
     @Builder.Default
     private String source = "DUMMY";  // DUMMY / CHZZK / YOUTUBE

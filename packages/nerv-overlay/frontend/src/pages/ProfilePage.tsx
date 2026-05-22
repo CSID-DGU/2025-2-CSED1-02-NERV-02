@@ -66,6 +66,7 @@ export function ProfilePage() {
 
   const connected = !!chzzkStatus.data?.connected
   const channelId = overlay.data?.channel_id
+  const channelName = overlay.data?.channel_name
   const isChzzkSource = overlay.data?.source === 'CHZZK'
 
   return (
@@ -119,9 +120,11 @@ export function ProfilePage() {
                 : <span className="service-state-pill state-off">○ 미연동</span>
               }
             </div>
-            {connected && isChzzkSource && channelId && (
+            {connected && isChzzkSource && (channelName || channelId) && (
               <div className="service-card-meta">
-                채널 ID: <code>{channelId.slice(0, 16)}…</code>
+                {channelName
+                  ? <>채널: <strong>{channelName}</strong></>
+                  : <>채널 ID: <code>{channelId!.slice(0, 16)}…</code></>}
               </div>
             )}
             <div className="service-card-actions">

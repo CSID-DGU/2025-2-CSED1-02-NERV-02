@@ -32,7 +32,7 @@ public class ProfileChzzkService {
         log.info("[ProfileChzzk] 본인 채널 식별: userId={} channelId={} channelName={}",
                 userId, me.channelId(), me.channelName());
 
-        return overlayConfigService.applyChzzkConnection(userId, me.channelId());
+        return overlayConfigService.applyChzzkConnection(userId, me.channelId(), me.channelName());
     }
 
     /** 연동 해제 — 토큰 삭제 + overlay 를 더미로 되돌림. */

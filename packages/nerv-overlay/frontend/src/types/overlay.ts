@@ -8,6 +8,7 @@ export interface OverlayConfig {
   overlay_url: string
   name: string
   channel_id: string | null
+  channel_name: string | null
   source: ChatSource
   security_level: SecurityLevel
   block_display_mode: BlockDisplayMode
