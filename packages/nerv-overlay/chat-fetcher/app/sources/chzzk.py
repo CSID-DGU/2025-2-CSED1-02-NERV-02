@@ -33,11 +33,14 @@ class ChzzkSession:
     async def start(self, on_message: Callable[[dict], Awaitable[None]]) -> None:
         # import here so import-time chzzkpy load 실패가 다른 source 에 영향 안 주게
         from chzzkpy import Client, UserPermission
+        from chzzkpy.authorization import AccessToken
 
         client_id = os.environ.get("CHZZK_CLIENT_ID")
         client_secret = os.environ.get("CHZZK_CLIENT_SECRET")
         if not client_id or not client_secret:
             raise RuntimeError("CHZZK_CLIENT_ID / CHZZK_CLIENT_SECRET 환경변수 필요")
+        if not self.access_token:
+            raise RuntimeError("CHZZK access_token 필요 (Spring 이 유효 토큰 전달)")
 
         self._on_message = on_message
         self.client = Client(client_id, client_secret)
@@ -72,11 +75,20 @@ class ChzzkSession:
             logger.info("[CHZZK] gateway connected channel=%s session=%s",
                         self.channel_id, session_id)
 
-        # refresh_token 으로 새 access_token 받고 user_client 발급
+        # Spring 이 전달한 (이미 유효한) access_token 으로 user_client 발급.
+        # refresh 는 Spring 이 전담 — 여기서 refresh_user_client 를 쓰면 토큰 rotation 이
+        # 이중으로 일어나 DB 와 어긋나므로, refresh 안 하는 get_user_client 를 사용.
+        # (chzzkpy 의 refreshable 은 _token_generated_at 기준 하루 경과 시에만 동작 → connect 즉시엔 refresh 안 함)
+        token_obj = AccessToken(
+            access_token=self.access_token,
+            refresh_token=self.refresh_token or "",
+            token_type="Bearer",
+            expires_in=86400,
+        )
         try:
-            self.user_client = await self.client.refresh_user_client(self.refresh_token)
+            self.user_client = await self.client.get_user_client(token_obj)
         except Exception as e:
-            logger.error("[CHZZK] refresh_user_client 실패: %s", e)
+            logger.error("[CHZZK] get_user_client 실패: %s", e)
             raise
 
         # connect 는 blocking — background task 로 실행
@@ -119,15 +131,16 @@ def make_chzzk_factory(
 ):
     """ChannelHub 호환 (starter, closer) 페어 생성.
 
-    chzzkpy 사용. refresh_token 필수 (access_token 도 같이 받지만 갱신은 chzzkpy 가 처리).
+    chzzkpy 사용. access_token 필수 (Spring 이 refresh 후 유효 토큰 전달).
+    refresh 는 Spring 이 전담하므로 여기서는 토큰 갱신을 하지 않는다.
     """
-    if not refresh_token:
-        raise RuntimeError("CHZZK source 에는 refresh_token 필요 (사용자 OAuth 인증 필요).")
+    if not access_token:
+        raise RuntimeError("CHZZK source 에는 access_token 필요 (사용자 OAuth 인증 필요).")
 
     async def starter(channel_id_in: str, publish: Callable[[dict], Awaitable[None]]) -> None:
         if channel_id_in in _active:
             return
-        sess = ChzzkSession(channel_id_in, access_token or "", refresh_token)
+        sess = ChzzkSession(channel_id_in, access_token, refresh_token or "")
         _active[channel_id_in] = sess
         try:
             await sess.start(publish)

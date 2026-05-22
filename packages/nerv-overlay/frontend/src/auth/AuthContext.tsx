@@ -34,12 +34,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await authApi.login(username, password)
     authStorage.set(res.token)
     setUser(res.user)
+    // 로그인 직후 hero 이름·연동 상태가 즉시 반영되도록 홈으로 이동 + 새로고침
+    window.location.href = '/'
   }, [])
 
   const register = useCallback(async (username: string, nickname: string, password: string) => {
     const res = await authApi.register(username, nickname, password)
     authStorage.set(res.token)
     setUser(res.user)
+    // 회원가입 = 로그인 상태 전환이므로 동일하게 새로고침
+    window.location.href = '/'
   }, [])
 
   const logout = useCallback(() => {

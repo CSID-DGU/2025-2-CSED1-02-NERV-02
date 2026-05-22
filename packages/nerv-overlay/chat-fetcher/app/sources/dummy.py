@@ -1,4 +1,4 @@
-"""테스트용 더미 채널 — 1초 간격으로 임의 메시지 발생.
+"""테스트용 더미 채널 — 약 2초 간격으로 임의 메시지 발생.
 
 실제 CHZZK/YouTube 통합 검증 전에 hub/구독 흐름을 확인하는 용도.
 """
@@ -14,7 +14,6 @@ _SAMPLES = [
     "오늘 방송 잼있네요",
     "이 시발 진짜",
     "병신같은 플레이",
-    "보지 못했어요",
     "씨발 또야?",
     "구독했습니다",
 ]
@@ -26,7 +25,7 @@ async def _loop(channel_id: str, publish: Callable[[dict], Awaitable[None]]):
     seq = 0
     try:
         while True:
-            await asyncio.sleep(random.uniform(0.8, 1.5))
+            await asyncio.sleep(random.uniform(1.8, 2.2))
             seq += 1
             await publish({
                 "id": f"dummy-{channel_id}-{seq}",
