@@ -115,29 +115,53 @@ class NervFilter:
     # ──────────────────────────────────────────────
     # 핵심 분석 API
     # ──────────────────────────────────────────────
-    def analyze(self, text: str) -> FilterResult:
-        """단일 텍스트 분석."""
+    def _resolve_lists(
+        self,
+        whitelist: Iterable[str] | None,
+        blacklist: Iterable[str] | None,
+    ) -> tuple[set[str], set[str], str]:
+        """요청별 whitelist/blacklist override 해석.
+
+        둘 다 None 이면 인스턴스 기본값 + 기존 dict_version 사용 (캐시 효율).
+        하나라도 주어지면 내용 해시로 per-request 캐시 키를 만든다.
+        """
+        if whitelist is None and blacklist is None:
+            return self._whitelist, self._blacklist, self._dict_version
+        wl = set(whitelist) if whitelist is not None else self._whitelist
+        bl = set(blacklist) if blacklist is not None else self._blacklist
+        import hashlib
+
+        h = hashlib.md5()
+        h.update(repr(sorted(wl)).encode("utf-8"))
+        h.update(b"|")
+        h.update(repr(sorted(bl)).encode("utf-8"))
+        return wl, bl, f"req-{h.hexdigest()[:16]}"
+
+    def analyze(
+        self,
+        text: str,
+        whitelist: Iterable[str] | None = None,
+        blacklist: Iterable[str] | None = None,
+    ) -> FilterResult:
+        """단일 텍스트 분석. whitelist/blacklist 를 주면 이번 호출에만 적용."""
         if text is None:
             raise ValueError("text must not be None")
-        raw = self._first_pass.execute(
-            text,
-            self._whitelist,
-            self._blacklist,
-            self._system_words,
-            self._dict_version,
-        )
+        wl, bl, version = self._resolve_lists(whitelist, blacklist)
+        raw = self._first_pass.execute(text, wl, bl, self._system_words, version)
         return self._to_filter_result(text, raw)
 
-    def analyze_batch(self, texts: list[str]) -> list[FilterResult]:
+    def analyze_batch(
+        self,
+        texts: list[str],
+        whitelist: Iterable[str] | None = None,
+        blacklist: Iterable[str] | None = None,
+    ) -> list[FilterResult]:
         """배치 분석 — Kiwi 배치 토큰화 활용으로 단일 호출 반복보다 빠름."""
         if not texts:
             return []
+        wl, bl, version = self._resolve_lists(whitelist, blacklist)
         raw_list = self._first_pass.execute_batch(
-            texts,
-            self._whitelist,
-            self._blacklist,
-            self._system_words,
-            self._dict_version,
+            texts, wl, bl, self._system_words, version
         )
         return [
             self._to_filter_result(t, r)

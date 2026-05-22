@@ -116,7 +116,11 @@ public class OverlayWebSocketHandler extends TextWebSocketHandler {
         long tsGenerated = ((Number) raw.getOrDefault("ts_received_ms", System.currentTimeMillis())).longValue();
         long tsFilterStart = System.currentTimeMillis();
 
-        filterClient.analyze(new FilterAnalyzeRequest(content, ctx.config.securityLevel()))
+        filterClient.analyze(new FilterAnalyzeRequest(
+                content,
+                ctx.config.securityLevel(),
+                ctx.config.whitelist(),
+                ctx.config.blacklist()))
                 .map(filterResp -> {
                     long tsFilterEnd = System.currentTimeMillis();
                     return new OverlayChatMessage(

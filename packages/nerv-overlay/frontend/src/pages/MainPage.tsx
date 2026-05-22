@@ -5,6 +5,7 @@ import { useOverlayWebSocket, type ChatMessage } from '../hooks/useOverlayWebSoc
 import { useLatencyStats } from '../hooks/useLatencyStats'
 import { LatencyGauge } from '../components/LatencyGauge'
 import { useAuth } from '../auth/AuthContext'
+import { resolveDisplay } from '../lib/chatDisplay'
 
 const SECURITY_LABEL: Record<string, { name: string; desc: string }> = {
   LOW:    { name: '관대',  desc: '경미한 욕설은 통과' },
@@ -114,6 +115,8 @@ export function MainPage() {
           <ChatList
             messages={messages}
             onRendered={markRendered}
+            blockMode={config.block_display_mode}
+            placeholder={config.placeholder_text}
           />
           {isDummyMode && <ChatInputBar />}
         </section>
@@ -134,9 +137,11 @@ export function MainPage() {
 interface ChatListProps {
   messages: ChatMessage[]
   onRendered: (id: string) => void
+  blockMode: string
+  placeholder: string
 }
 
-function ChatList({ messages, onRendered }: ChatListProps) {
+function ChatList({ messages, onRendered, blockMode, placeholder }: ChatListProps) {
   const listRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
 
@@ -159,7 +164,13 @@ function ChatList({ messages, onRendered }: ChatListProps) {
     <div className="main-message-list" ref={listRef} onScroll={handleScroll}>
       {messages.length === 0 && <p className="empty-list">메시지 대기 중...</p>}
       {messages.map((m) => (
-        <ChatLine key={m.id} msg={m} onRendered={() => onRendered(m.id)} />
+        <ChatLine
+          key={m.id}
+          msg={m}
+          onRendered={() => onRendered(m.id)}
+          blockMode={blockMode}
+          placeholder={placeholder}
+        />
       ))}
     </div>
   )
@@ -168,9 +179,11 @@ function ChatList({ messages, onRendered }: ChatListProps) {
 interface ChatLineProps {
   msg: ChatMessage
   onRendered: () => void
+  blockMode: string
+  placeholder: string
 }
 
-function ChatLine({ msg, onRendered }: ChatLineProps) {
+function ChatLine({ msg, onRendered, blockMode, placeholder }: ChatLineProps) {
   const reportedRef = useRef(false)
   useEffect(() => {
     if (reportedRef.current) return
@@ -178,18 +191,19 @@ function ChatLine({ msg, onRendered }: ChatLineProps) {
     requestAnimationFrame(() => onRendered())
   }, [msg, onRendered])
 
+  const { text: display, hidden } = resolveDisplay(msg, blockMode, placeholder)
+  if (hidden) return null
+
   const className = `chat-line action-${msg.action.toLowerCase()}`
-  const display =
-    msg.action === 'NORMAL' || msg.action === 'REVIEW' ? msg.original_text : msg.masked_text
 
   return (
     <div className={className}>
-      <span className="author">{msg.author}</span>
-      <span className="text">{display}</span>
+      <div className="chat-line-author">{msg.author}</div>
+      <div className="chat-line-text">{display}</div>
       {msg.detected_words.length > 0 && (
-        <span className="detected">
+        <div className="chat-line-detected">
           {msg.detected_words.map((d) => d.word).join(', ')}
-        </span>
+        </div>
       )}
     </div>
   )

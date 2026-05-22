@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
 import { overlaysApi } from '../api/overlays'
 import { useOverlayWebSocket, type ChatMessage } from '../hooks/useOverlayWebSocket'
+import { resolveDisplay } from '../lib/chatDisplay'
 
 /**
  * OBS Browser Source 가 로드하는 페이지.
@@ -43,7 +44,7 @@ export function OverlayPage() {
 
 interface ChatLineProps {
   msg: ChatMessage
-  mode: 'MASK' | 'HIDE' | 'PLACEHOLDER'
+  mode: string
   placeholder: string
   onRendered: () => void
 }
@@ -57,21 +58,14 @@ function ChatLine({ msg, mode, placeholder, onRendered }: ChatLineProps) {
     requestAnimationFrame(() => onRendered())
   }, [msg, onRendered])
 
-  const display = useMemo(() => {
-    if (msg.action === 'NORMAL' || msg.action === 'REVIEW') return msg.original_text
-    if (msg.action === 'PARTIAL_MASK') return msg.masked_text
-    if (mode === 'HIDE') return null
-    if (mode === 'PLACEHOLDER') return placeholder
-    return msg.masked_text
-  }, [msg, mode, placeholder])
-
-  if (display === null) return null
+  const { text: display, hidden } = resolveDisplay(msg, mode, placeholder)
+  if (hidden) return null
 
   const className = `chat-line action-${msg.action.toLowerCase()}`
   return (
     <div className={className}>
-      <span className="author">{msg.author}</span>
-      <span className="text">{display}</span>
+      <div className="chat-line-author">{msg.author}</div>
+      <div className="chat-line-text">{display}</div>
     </div>
   )
 }
