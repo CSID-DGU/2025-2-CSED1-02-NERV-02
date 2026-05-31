@@ -169,30 +169,6 @@ export function SettingsPage() {
         )}
       </form>
 
-      {/* ── 섹션 3: OBS Browser Source URL ── */}
-      {existing && (
-        <section className="settings-section overlay-url-section">
-          <h2 className="section-title">OBS Browser Source URL</h2>
-          <div className="url-row">
-            <code>{existing.overlay_url}</code>
-            <button
-              type="button"
-              className="btn-tiny"
-              onClick={() => navigator.clipboard.writeText(existing.overlay_url)}
-            >
-              복사
-            </button>
-          </div>
-          <p className="hint">
-            OBS → Sources → + → Browser → URL 에 붙여넣으세요.
-          </p>
-          <div className="quick-links">
-            <Link to={`/overlay/${existing.overlay_token}`} target="_blank" className="btn">
-              오버레이 미리보기
-            </Link>
-          </div>
-        </section>
-      )}
     </div>
   )
 }
