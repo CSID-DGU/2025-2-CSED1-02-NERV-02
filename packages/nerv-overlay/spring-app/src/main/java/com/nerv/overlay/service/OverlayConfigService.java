@@ -25,8 +25,13 @@ public class OverlayConfigService {
 
     private final OverlayConfigRepository repository;
 
-    @Value("${app.public-base-url:http://localhost:8080}")
-    private String publicBaseUrl;
+    /**
+     * 사용자에게 노출되는 OBS Browser Source URL 의 host.
+     * OverlayPage 는 프론트엔드(Vercel)에 있으므로 frontend-base-url 을 사용한다.
+     * (ChzzkOAuthService 의 OAuth callback URL 은 별개로 public-base-url=Spring 도메인.)
+     */
+    @Value("${app.frontend-base-url:http://localhost:5173}")
+    private String overlayBaseUrl;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -50,7 +55,7 @@ public class OverlayConfigService {
         OverlayConfig saved = repository.save(entity);
         log.info("[OverlayConfig] 생성: id={} owner={} token={}",
                 saved.getId(), ownerUserId, saved.getOverlayToken());
-        return OverlayConfigDto.from(saved, publicBaseUrl);
+        return OverlayConfigDto.from(saved, overlayBaseUrl);
     }
 
     /** 토큰으로 조회 — 오버레이 페이지 로드 시 */
@@ -58,7 +63,7 @@ public class OverlayConfigService {
     public OverlayConfigDto findByToken(String overlayToken) {
         OverlayConfig entity = repository.findByOverlayToken(overlayToken)
                 .orElseThrow(() -> new IllegalArgumentException("오버레이를 찾을 수 없습니다: " + overlayToken));
-        return OverlayConfigDto.from(entity, publicBaseUrl);
+        return OverlayConfigDto.from(entity, overlayBaseUrl);
     }
 
     /** ID로 조회 (관리용) */
@@ -66,13 +71,13 @@ public class OverlayConfigService {
     public OverlayConfigDto findById(Long id) {
         OverlayConfig entity = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("오버레이를 찾을 수 없습니다: id=" + id));
-        return OverlayConfigDto.from(entity, publicBaseUrl);
+        return OverlayConfigDto.from(entity, overlayBaseUrl);
     }
 
     @Transactional(readOnly = true)
     public List<OverlayConfigDto> findAll() {
         return repository.findAll().stream()
-                .map(e -> OverlayConfigDto.from(e, publicBaseUrl))
+                .map(e -> OverlayConfigDto.from(e, overlayBaseUrl))
                 .toList();
     }
 
@@ -87,7 +92,7 @@ public class OverlayConfigService {
                 : repository.findFirstByOwnerUserId(userId);
 
         return existing
-                .map(e -> OverlayConfigDto.from(e, publicBaseUrl))
+                .map(e -> OverlayConfigDto.from(e, overlayBaseUrl))
                 .orElseGet(() -> create(userId, new OverlayConfigRequest(
                         "더미테스트",
                         null,           // channel_id
@@ -128,7 +133,7 @@ public class OverlayConfigService {
         entity.setChannelName(channelName);
         log.info("[OverlayConfig] 치지직 연동 적용: userId={} channelId={} channelName={}",
                 userId, channelId, channelName);
-        return OverlayConfigDto.from(entity, publicBaseUrl);
+        return OverlayConfigDto.from(entity, overlayBaseUrl);
     }
 
     /** 치지직 해제 — 더미로 되돌림. */
@@ -140,7 +145,7 @@ public class OverlayConfigService {
         entity.setChannelId(null);
         entity.setChannelName(null);
         log.info("[OverlayConfig] 치지직 연동 해제: userId={}", userId);
-        return OverlayConfigDto.from(entity, publicBaseUrl);
+        return OverlayConfigDto.from(entity, overlayBaseUrl);
     }
 
     /** 부분 갱신 — null 필드는 변경 안 함 */
@@ -166,7 +171,7 @@ public class OverlayConfigService {
         }
 
         log.info("[OverlayConfig] 수정: id={}", entity.getId());
-        return OverlayConfigDto.from(entity, publicBaseUrl);
+        return OverlayConfigDto.from(entity, overlayBaseUrl);
     }
 
     @Transactional
