@@ -4,6 +4,41 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthContext'
 import { overlaysApi } from '../api/overlays'
 
+/**
+ * OBS Browser Source 의 "Custom CSS" 필드에 붙여넣어 송출 화면에 최적화하는 스타일.
+ * - 페이지 배경 투명 (방송 화면 위에 올림)
+ * - 헤더 숨김
+ * - 채팅 버블 가독성 (반투명 검정 + 흰 텍스트 + 텍스트 그림자)
+ */
+const OBS_CUSTOM_CSS = `/* NERV Overlay — OBS Browser Source Custom CSS */
+html, body {
+  background: transparent !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+.overlay-root { background: transparent !important; }
+.overlay-header { display: none !important; }
+.overlay-message-list { padding: 8px !important; }
+.chat-line {
+  background: rgba(0, 0, 0, 0.65) !important;
+  border-radius: 12px !important;
+  padding: 8px 14px !important;
+  margin-bottom: 6px !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.chat-line-author {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
+}
+.chat-line-text {
+  color: #ffffff !important;
+  font-size: 15px !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
+}`
+
 export function ProfilePage() {
   const { user, loading, logout } = useAuth()
   const qc = useQueryClient()
@@ -165,6 +200,59 @@ export function ProfilePage() {
           </div>
         </div>
       </section>
+
+      {/* ── OBS Browser Source — 송출 화면에 채팅 오버레이 ── */}
+      {overlay.data && (
+        <section className="profile-section">
+          <h2 className="section-title">OBS Browser Source</h2>
+          <p className="hint" style={{ marginBottom: 14 }}>
+            OBS Studio → Sources → + → Browser 로 추가한 뒤, 아래 URL 과 Custom CSS 를 붙여넣으세요.
+          </p>
+
+          <div className="obs-block">
+            <div className="obs-label">URL</div>
+            <div className="url-row">
+              <code>{overlay.data.overlay_url}</code>
+              <button
+                type="button"
+                className="btn-tiny"
+                onClick={() => {
+                  navigator.clipboard.writeText(overlay.data!.overlay_url)
+                  setFlash({ kind: 'ok', msg: 'URL 을 클립보드에 복사했습니다.' })
+                }}
+              >
+                복사
+              </button>
+            </div>
+          </div>
+
+          <div className="obs-block">
+            <div className="obs-label">Custom CSS <span>· 투명 배경 + 가독성 (선택)</span></div>
+            <div className="obs-css-row">
+              <pre className="obs-css-pre">{OBS_CUSTOM_CSS}</pre>
+              <button
+                type="button"
+                className="btn-tiny obs-css-copy"
+                onClick={() => {
+                  navigator.clipboard.writeText(OBS_CUSTOM_CSS)
+                  setFlash({ kind: 'ok', msg: 'Custom CSS 를 클립보드에 복사했습니다.' })
+                }}
+              >
+                복사
+              </button>
+            </div>
+            <p className="hint" style={{ marginTop: 6 }}>
+              OBS Browser Source 속성 창의 <strong>Custom CSS</strong> 칸에 붙여넣으면 배경이 투명해지고 채팅이 또렷하게 보입니다.
+            </p>
+          </div>
+
+          <div className="quick-links" style={{ marginTop: 14 }}>
+            <Link to={`/overlay/${overlay.data.overlay_token}`} target="_blank" className="btn">
+              오버레이 미리보기
+            </Link>
+          </div>
+        </section>
+      )}
     </div>
   )
 }
