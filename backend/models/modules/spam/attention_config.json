@@ -1,0 +1,21 @@
+{
+  "architecture": "bert_mlp_attention_classifier",
+  "base_model_name": "beomi/kcbert-large",
+  "max_length": 128,
+  "attention_hidden_dim": 128,
+  "classifier_hidden_dim": 128,
+  "dropout": 0.1,
+  "freeze_bert": true,
+  "class_names": [
+    "normal",
+    "positive"
+  ],
+  "best_f1": 0.9896907216494846,
+  "best_epoch": 1,
+  "batch_size": 8,
+  "epochs": 3,
+  "learning_rate": 0.0001,
+  "weight_decay": 0.01,
+  "pos_weight_mode": "raw",
+  "max_pos_weight": 4.0
+}

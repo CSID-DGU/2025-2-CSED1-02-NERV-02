@@ -53,6 +53,7 @@ class TextAnalysisService:
             original_text=text,
             processed_text=final_decision["processed_text"],
             action=final_decision["action"],
+            ai_modules=scorer_result.get("ai_modules", []),
             score=scorer_result["score"],
             details=FilterResult.model_validate(filter_result),
             flags=ScorerFlags(
@@ -132,6 +133,9 @@ class TextAnalysisService:
         if not user.use_detail_ai_model:
             return False
 
+        if not user.enabled_modules or not user.enabled_modules.strip():
+            return False
+    
         if scorer_result.get("has_blacklist"):
             return False
 

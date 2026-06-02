@@ -1,70 +1,69 @@
 import logging
-import os
 from dataclasses import dataclass
-from enum import Enum
-from app.core import settings
+from pathlib import Path
 
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
-from transformers.utils import logging as hf_logging
-
+from app.core import config
+from app.ai.attention_manager import AttentionAIManager
 
 logger = logging.getLogger(__name__)
-hf_logging.set_verbosity_error()
 
+KCBERT_BASE_MODEL_DIR : str = "models/kcbert_large"
+ATTENTION_MODULES_ROOT : str = "models/modules"
 
-class SecondPassModelType(str, Enum):
-    SPAM = "spam"
-    PII = "pii"
-    POLITICS = "politics"
-    CRITICISM = "criticism"
-    BASIC = "basic"
-    SEXUAL = "sexual"
+AI_MAX_LENGTH : int = 128
 
+ENABLED_AI_MODULES: list[str] = [
+    "basic",
+    "sexual",
+    "pii",
+    "criticism",
+    "politics",
+    "spam",
+    "family"
+]
 
 @dataclass
-class ModelBundle:
-    model_type: SecondPassModelType
-    repo_id: str
-    tokenizer: object
-    model: object
+class AttentionModelBundle:
+    manager: AttentionAIManager
 
+def _get_enabled_modules() -> list[str]:
+    modules_root = Path(ATTENTION_MODULES_ROOT)
+    enabled_modules: list[str] = []
 
-def build_repo_id(model_type: SecondPassModelType) -> str:
-    if not settings.HF_MODEL_OWNER:
-        raise ValueError("HF_MODEL_OWNER 환경변수가 설정되지 않았습니다.")
-    return f"{settings.HF_MODEL_OWNER}/kcbert-{model_type.value}-classifier"
+    for module_name in ENABLED_AI_MODULES:
+        module_dir = modules_root / module_name
+        head_path = module_dir / "attention_head.pt"
+        config_path = module_dir / "attention_config.json"
 
+        if head_path.exists() and config_path.exists():
+            enabled_modules.append(module_name)
+        else:
+            logger.warning(
+                "[AI MODEL] %s 모듈 파일이 없어 로드에서 제외합니다. path=%s",
+                module_name,
+                module_dir,
+            )
 
-def load_single_model(model_type: SecondPassModelType) -> ModelBundle:
-    repo_id = build_repo_id(model_type)
+    return enabled_modules
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        repo_id,
-        token=settings.HF_TOKEN,
-    )
-    model = AutoModelForSequenceClassification.from_pretrained(
-        repo_id,
-        token=settings.HF_TOKEN,
-    )
-    model.eval()
-
-    logger.info(f"[AI MODEL] {model_type.value} 로드 완료")
-
-    return ModelBundle(
-        model_type=model_type,
-        repo_id=repo_id,
-        tokenizer=tokenizer,
-        model=model,
-    )
-
-
-def load_all_second_pass_models() -> dict[SecondPassModelType, ModelBundle]:
+def load_attention_second_pass_models() -> AttentionModelBundle:
     logger.info("[AI MODEL] 2차 필터 모델 로드 시작")
 
-    models = {
-        model_type: load_single_model(model_type)
-        for model_type in SecondPassModelType
-    }
+    enabled_modules = _get_enabled_modules()
 
-    logger.info(f"[AI MODEL] 전체 모델 로드 완료 ({len(models)}개)")
-    return models
+    if not enabled_modules:
+        raise RuntimeError("[AI MODEL] 로드 가능한 attention 모듈이 없습니다.")
+
+    manager = AttentionAIManager(
+        base_model_dir=KCBERT_BASE_MODEL_DIR,
+        modules_root=ATTENTION_MODULES_ROOT,
+        enabled_modules=enabled_modules,
+        max_length=AI_MAX_LENGTH,
+    )
+
+    logger.info("[AI MODEL] 2차 필터 모델 로드 완료: %s", enabled_modules)
+
+    return AttentionModelBundle(manager=manager)
+
+def load_all_second_pass_models() -> AttentionModelBundle:
+    return load_attention_second_pass_models()

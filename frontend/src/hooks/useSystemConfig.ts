@@ -1,59 +1,59 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchSystemConfig, updateSystemConfig, addDictionaryWord, fetchDictionary, deleteDictionaryWord, linkYoutubeChannel, unlinkYoutubeChannel } from '../api/services';
-import type { AppSettings, SystemConfigResponse, DictionaryRequest } from '../api/types';
+import type { AppSettings, SystemConfigResponse, DictionaryRequest, SystemConfigUpdate } from '../api/types';
 
-const MODULE_MAP: Record<keyof AppSettings['modules'], string> = {
-  modified: 'MODIFIED',
-  sexual: 'SEXUAL',
-  privacy: 'PRIVACY',
-  aggression: 'AGGRESSION',
-  political: 'POLITICAL',
-  spam: 'SPAM',
-  family: 'FAMILY',
-};
+const MODULE_KEYS = [
+  'spam',
+  'pii',
+  'politics',
+  'criticism',
+  'basic',
+  'sexual',
+] as const;
 
 // [변환기] 백엔드 -> 프론트엔드
 const transformToAppSettings = (data: SystemConfigResponse): AppSettings => {
   const modules: AppSettings['modules'] = {
-    modified: false,
-    sexual: false,
-    privacy: false,
-    aggression: false,
-    political: false,
     spam: false,
-    family: false,
+    pii: false,
+    politics: false,
+    criticism: false,
+    basic: false,
+    sexual: false,
   };
 
-  const enabledModulesArray = data.enabled_modules ? data.enabled_modules.split(',').map(m => m.trim()) : [];
+  const enabledModules = new Set(
+    data.enabled_modules
+      ? data.enabled_modules
+          .split(',')
+          .map((m) => m.trim().toLowerCase())
+          .filter(Boolean)
+      : []
+  );
 
-  (Object.keys(MODULE_MAP) as Array<keyof typeof MODULE_MAP>).forEach((uiKey) => {
-    const backendKey = MODULE_MAP[uiKey];
-    if (enabledModulesArray.includes(backendKey)) {
-      modules[uiKey] = true;
-    }
+  MODULE_KEYS.forEach((key) => {
+    modules[key] = enabledModules.has(key);
   });
 
   return {
     intensity: data.security_level,
     aiSoftenEnabled: data.ai_soften_enabled,
+    useDetailAiModel: data.use_detail_ai_model,
     modules,
   };
 };
 
 // [변환기] 프론트엔드 -> 백엔드
-const transformToBackendUpdate = (settings: AppSettings) => {
-  const enabled_modules_array: string[] = [];
-
-  (Object.keys(settings.modules) as Array<keyof typeof settings.modules>).forEach((uiKey) => {
-    if (settings.modules[uiKey]) {
-      enabled_modules_array.push(MODULE_MAP[uiKey]);
-    }
-  });
+const transformToBackendUpdate = (settings: AppSettings): SystemConfigUpdate => {
+  const enabled_modules = MODULE_KEYS
+    .filter((key) => settings.modules[key])
+    .join(',');
 
   return {
     security_level: settings.intensity,
     ai_soften_enabled: settings.aiSoftenEnabled,
-    enabled_modules: enabled_modules_array.join(','),
+    use_detail_ai_model: settings.useDetailAiModel,
+    enabled_modules,
   };
 };
 
@@ -64,7 +64,7 @@ const transformToBackendUpdate = (settings: AppSettings) => {
 const PLACEHOLDER_CONFIG: SystemConfigResponse = {
   user_id: 0,
   security_level: 'MEDIUM',
-  enabled_modules: 'ALL',
+  enabled_modules: 'spam,pii,politics,criticism,basic,sexual',
   ai_soften_enabled: false,
   use_detail_ai_model: false,
   youtube_channel_id: null,
@@ -132,9 +132,8 @@ export const useUpdateSettings = () => {
       return updateSystemConfig(payload);
     },
 
-    onMutate: async (newSettings) => {
+    onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ['system-config'] });
-      queryClient.setQueryData(['system-config'], newSettings);
     },
 
     onError: (err) => {

@@ -20,6 +20,10 @@ export interface YoutubeAnalysisResponse {
   results: RawComment[];
 }
 
+export type AiModuleKey = 'spam' | 'pii' | 'politics' | 'criticism' | 'basic' | 'sexual';
+
+export type AiModules = Record<AiModuleKey, boolean>;
+
 export type SecurityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export type ModerationAction = 'NORMAL' | 'REVIEW' | 'PARTIAL_MASK' | 'FULL_BLOCK' | 'ERROR';
@@ -44,6 +48,7 @@ export interface TextAnalysisResponse {
     masked_text: string;
   };
   flags: ScorerFlags;
+  ai_modules?: string[];
 }
 
 export interface AnalyzeTextsRequest {
@@ -62,6 +67,7 @@ export interface AnalyzedComment {
   score: number;
   detected_words: { word: string; type: string }[];
   flags: ScorerFlags;
+  ai_modules?: string[];
 }
 
 export interface FullAnalysisResponse {
@@ -99,15 +105,8 @@ export interface SystemConfigUpdate {
 export interface AppSettings {
   intensity: SecurityLevel;
   aiSoftenEnabled: boolean;
-  modules: {
-    modified: boolean;
-    sexual: boolean;
-    privacy: boolean;
-    aggression: boolean;
-    political: boolean;
-    spam: boolean;
-    family: boolean;
-  };
+  useDetailAiModel: boolean;
+  modules: AiModules;
 }
 
 export interface FilteredKeyword {
