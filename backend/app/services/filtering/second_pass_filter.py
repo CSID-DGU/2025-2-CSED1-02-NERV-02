@@ -1,5 +1,4 @@
 import logging
-import torch
 
 from app.services.filtering.ai_model import load_all_second_pass_models
 
@@ -8,17 +7,18 @@ logger = logging.getLogger(__name__)
 
 class SecondPassFilter:
     def __init__(self):
-        self.models = load_all_second_pass_models()
+        self.model_bundle = load_all_second_pass_models()
+        self.ai_manager = self.model_bundle.manager
 
-    async def execute(self, first_pass_result: dict, enabled_modules: str = "ALL") -> dict:
+    async def execute(
+        self,
+        first_pass_result: dict,
+        enabled_modules: str = "ALL",
+    ) -> dict:
         original_text = first_pass_result["original_text"]
 
-        # User가 설정한 모듈 파싱
-        if not enabled_modules:
-            enabled = set()
-        else:
-            enabled = {m.strip().lower() for m in enabled_modules.split(",") if m.strip()}
-        
+        enabled = self._parse_enabled_modules(enabled_modules)
+
         try:
             ai_scores = await self._call_ai_model(original_text, enabled)
 
@@ -31,36 +31,41 @@ class SecondPassFilter:
             logger.error(f"2차 필터링 중 오류 발생: {e}", exc_info=True)
             return first_pass_result
 
-    async def _call_ai_model(self, text: str, enabled_modules: set[str]) -> dict:
-        results = {}
-
+    def _parse_enabled_modules(self, enabled_modules: str) -> set[str] | None:
         if not enabled_modules:
-            return results
-        
-        for model_type, bundle in self.models.items():
-             # User가 설정하지 않은 모델은 스킵
-            if model_type.value not in enabled_modules:
-                continue
-                        
-            inputs = bundle.tokenizer(
-                text,
-                return_tensors="pt",
-                truncation=True,
-                padding=True,
-                max_length=256,
-            )
-            inputs = {k: v.to(bundle.model.device) for k, v in inputs.items()}
+            return set()
 
-            with torch.no_grad():
-                outputs = bundle.model(**inputs)
-                logits = outputs.logits
+        raw = enabled_modules.strip()
 
-                if logits.shape[-1] == 1:
-                    score = torch.sigmoid(logits).item()
-                else:
-                    probs = torch.softmax(logits, dim=-1)
-                    score = probs[:, 1].item()
+        if raw.upper() == "ALL":
+            return None
 
-            results[model_type.value] = float(score)
+        return {
+            module_name.strip().lower()
+            for module_name in raw.split(",")
+            if module_name.strip()
+        }
 
-        return results
+    async def _call_ai_model(
+        self,
+        text: str,
+        enabled_modules: set[str] | None,
+    ) -> dict[str, float]:
+        return self.ai_manager.predict_one(
+            text=text,
+            enabled_modules=enabled_modules,
+        )
+
+    async def update_ai_module(
+        self,
+        module_name: str,
+        text: str,
+        label: int,
+        save: bool = True,
+    ) -> dict:
+        return self.ai_manager.update_one(
+            module_name=module_name,
+            text=text,
+            label=label,
+            save=save,
+        )

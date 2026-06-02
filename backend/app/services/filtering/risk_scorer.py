@@ -41,6 +41,7 @@ _AI_THRESHOLDS = {
     "criticism": 0.8,
     "basic": 0.8,
     "sexual": 0.8,
+    "family": 0.8,
 }
 
 def _is_standalone_consonant(ch: str) -> bool:

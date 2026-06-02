@@ -18,3 +18,5 @@ pydantic-settings
 pyjwt
 pwdlib[argon2]
 python-multipart
+huggingface_hub
+torch==2.6.0+cu126

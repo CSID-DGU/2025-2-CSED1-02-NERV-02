@@ -12,3 +12,4 @@ env/
 .idea/
 
 data/active_learning
+models/kcbert_large
