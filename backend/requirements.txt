@@ -1,3 +1,5 @@
+--extra-index-url https://download.pytorch.org/whl/cu126
+
 fastapi
 uvicorn[standard]
 google-api-python-client
@@ -19,4 +21,4 @@ pyjwt
 pwdlib[argon2]
 python-multipart
 huggingface_hub
-torch==2.6.0+cu126
+torch>=2.6.0
