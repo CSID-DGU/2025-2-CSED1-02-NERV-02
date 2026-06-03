@@ -339,11 +339,17 @@ a:hover { text-decoration: underline; }
 }
 .main-message-list {
   flex: 1;
+  min-height: 0;          /* flex 자식이 부모 max-height 안에서 줄어들 수 있게 */
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding-bottom: 12px;
+  /* 위로 사라지는 페이드 효과 (상단 20% 그라데이션 마스크) */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 56px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 56px);
+  /* 새 메시지는 항상 하단으로 — 컨테이너 부족 시 위쪽이 밀려 올라가 사라지듯 보임 */
+  justify-content: flex-end;
 }
 /* main-feed 의 채팅은 공통 .chat-line 디자인을 그대로 사용 (이름 상단/채팅 하단) */
 
@@ -1116,6 +1122,95 @@ legend {
   overflow-y: auto;
 }
 .obs-css-copy { align-self: flex-start; flex-shrink: 0; }
+
+/* ─────────────────────────────────────────
+   히스토리 페이지
+   ───────────────────────────────────────── */
+.history-blocks { display: flex; flex-direction: column; gap: 10px; }
+
+.history-block {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.history-block-open { box-shadow: 0 0 0 1px var(--color-primary) inset; }
+
+.history-block-head {
+  width: 100%;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+}
+.history-block-head:hover { background: var(--color-surface-alt); }
+.history-block-title { display: flex; align-items: center; gap: 10px; }
+.history-date { font-weight: 700; font-size: 15px; }
+.history-live-pill {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 999px;
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-danger-text);
+}
+.history-block-meta {
+  display: flex; align-items: center; gap: 14px;
+  font-size: 12px; color: var(--color-text-muted);
+}
+.history-filtered-count { color: var(--color-warn-text); font-weight: 600; }
+.history-block-toggle { font-size: 14px; color: var(--color-text-faint); }
+
+.history-messages { padding: 0 0 14px; border-top: 1px solid var(--color-border); }
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.history-table th, .history-table td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+.history-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--color-surface-alt);
+}
+.history-table tr:last-child td { border-bottom: 0; }
+.history-time { color: var(--color-text-faint); font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
+.history-author { font-weight: 600; color: var(--color-text); white-space: nowrap; }
+.history-content { color: var(--color-text); word-break: break-all; max-width: 480px; }
+.history-action { white-space: nowrap; }
+.history-row-locked { background: rgba(99, 102, 241, 0.05); }
+.history-row-locked .history-content { opacity: 0.7; }
+
+.history-pill {
+  display: inline-block;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.history-pill.action-review       { background: var(--color-warn-soft);   color: var(--color-warn-text); }
+.history-pill.action-partial_mask { background: rgba(249, 115, 22, 0.18); color: #fdba74; }
+.history-pill.action-full_block   { background: var(--color-danger-soft); color: var(--color-danger-text); }
+
+.history-actions {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px 0;
+}
+.history-actions .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 
 .flash {
   display: flex; align-items: center; gap: 8px;

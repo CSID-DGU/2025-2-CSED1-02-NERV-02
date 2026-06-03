@@ -7,6 +7,7 @@ import com.nerv.overlay.dto.FilterAnalyzeRequest;
 import com.nerv.overlay.dto.OverlayChatMessage;
 import com.nerv.overlay.dto.OverlayConfigDto;
 import com.nerv.overlay.entity.ChzzkToken;
+import com.nerv.overlay.service.BroadcastHistoryService;
 import com.nerv.overlay.service.ChzzkOAuthService;
 import com.nerv.overlay.service.OverlayConfigService;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class OverlayWebSocketHandler extends TextWebSocketHandler {
     private final FilterServiceClient filterClient;
     private final ChatFetcherSubscriber chatFetcher;
     private final ChzzkOAuthService chzzkOAuthService;
+    private final BroadcastHistoryService historyService;
     private final ObjectMapper objectMapper;
 
     private final Map<String, SessionContext> sessions = new ConcurrentHashMap<>();
@@ -138,7 +140,32 @@ public class OverlayWebSocketHandler extends TextWebSocketHandler {
                             System.currentTimeMillis()
                     );
                 })
-                .doOnSuccess(payload -> sendJson(session, payload))
+                .doOnSuccess(payload -> {
+                    sendJson(session, payload);
+                    // 로그인 사용자의 채팅이면 히스토리에 기록 (NORMAL/REVIEW 는 카운트만, 차단류는 본문도)
+                    Long ownerId = ctx.config.ownerUserId();
+                    if (ownerId != null && payload != null) {
+                        try {
+                            String detected = payload.detectedWords().stream()
+                                    .map(d -> d.word() + "|" + d.type())
+                                    .reduce((a, b) -> a + "," + b)
+                                    .orElse(null);
+                            historyService.record(
+                                    ownerId,
+                                    ctx.config.source(),
+                                    ctx.config.channelId(),
+                                    payload.author(),
+                                    payload.originalText(),
+                                    payload.maskedText(),
+                                    payload.action(),
+                                    payload.score(),
+                                    detected
+                            );
+                        } catch (Exception e) {
+                            log.warn("[WS] 히스토리 기록 실패: {}", e.getMessage());
+                        }
+                    }
+                })
                 .onErrorResume(e -> {
                     log.warn("[WS] filter 호출 실패: {}", e.getMessage());
                     return Mono.empty();

@@ -52,6 +52,7 @@ public class SecurityConfig {
                         // 인증 필요
                         .requestMatchers("/api/auth/me").authenticated()
                         .requestMatchers("/api/profile/**").authenticated()
+                        .requestMatchers("/api/history/**").authenticated()
                         // 그 외는 일단 공개 (관리자 라우팅은 나중에 ROLE 도입)
                         .anyRequest().permitAll()
                 )

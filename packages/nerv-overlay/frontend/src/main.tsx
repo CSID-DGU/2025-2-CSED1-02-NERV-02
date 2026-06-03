@@ -7,6 +7,7 @@ import { App } from './App'
 import { MainPage } from './pages/MainPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { HistoryPage } from './pages/HistoryPage'
 import { OverlayPage } from './pages/OverlayPage'
 import { AuthProvider } from './auth/AuthContext'
 
@@ -26,6 +27,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/" element={<MainPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/history" element={<HistoryPage />} />
             </Route>
             {/* OBS 친화 — 네비 없음 */}
             <Route path="/overlay/:token" element={<OverlayPage />} />
