@@ -9,11 +9,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# 1) 로컬 nerv-filter SDK 복사 + 설치 (PyPI 보다 항상 최신)
-COPY nerv-filter/ /tmp/nerv-filter/
-RUN pip install --no-cache-dir /tmp/nerv-filter
+# 1) torch CPU 버전 먼저 (기본 인덱스는 CUDA 빌드라 용량 큼 → CPU wheel 명시)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 
-# 2) FastAPI 등 나머지 의존성
+# 2) 로컬 nerv-filter SDK + 2차 의존성([ai]: transformers 등). torch 는 위에서 CPU 설치됨.
+COPY nerv-filter/ /tmp/nerv-filter/
+RUN pip install --no-cache-dir "/tmp/nerv-filter[ai]"
+
+# 3) FastAPI 등 나머지 의존성
 RUN pip install --no-cache-dir \
     "fastapi>=0.115.0" \
     "uvicorn[standard]>=0.30.0" \

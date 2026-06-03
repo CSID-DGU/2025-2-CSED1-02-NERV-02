@@ -14,6 +14,7 @@ export interface OverlayConfig {
   block_display_mode: BlockDisplayMode
   placeholder_text: string
   show_score: boolean
+  use_ai_filter: boolean
   whitelist: string[]
   blacklist: string[]
   created_at: string
@@ -28,6 +29,7 @@ export interface OverlayConfigRequest {
   block_display_mode?: BlockDisplayMode
   placeholder_text?: string
   show_score?: boolean
+  use_ai_filter?: boolean
   whitelist?: string[]
   blacklist?: string[]
 }

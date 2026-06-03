@@ -4,12 +4,14 @@
 - GET  /health           헬스 체크
 - POST /analyze          단일 텍스트 분석
 - POST /analyze/batch    배치 분석
+- POST /train-one        2차 모듈 실시간 단일 학습 (활성 시)
 - GET  /info             SDK / 사전 정보
 
 Spring 앱이 내부 호출 용도. 외부 노출 안 됨.
 """
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -24,10 +26,30 @@ from nerv_filter import NervFilter, SecurityLevel
 # ─────────────────────────────────────────────
 _state: dict = {}
 
+logger = logging.getLogger("uvicorn")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    _state["filter"] = NervFilter(security_level=SecurityLevel.MEDIUM)
+    # 2차 필터 — 환경변수 기반. SECOND_PASS_ENABLED=false 면 강제 1차만.
+    # 그 외에는 SDK 동봉 attention head + KcBERT 다운로드(첫 호출 시)로 활성화.
+    second_pass = None
+    try:
+        from nerv_filter.second_pass import SecondPassConfig
+
+        sp = SecondPassConfig.from_env()
+        if sp.is_enabled:
+            second_pass = sp
+            logger.info(
+                "[filter-service] 2차 필터 설정: models=%s threshold=%s modules_root=%s",
+                sp.models, sp.threshold, sp.resolved_modules_root,
+            )
+        else:
+            logger.info("[filter-service] 2차 필터 비활성 (1차만)")
+    except Exception as e:
+        logger.warning("[filter-service] 2차 설정 로드 실패, 1차만: %s", e)
+
+    _state["filter"] = NervFilter(security_level=SecurityLevel.MEDIUM, second_pass=second_pass)
     yield
     _state.clear()
 
@@ -42,7 +64,7 @@ def get_filter() -> NervFilter:
 app = FastAPI(
     title="nerv-overlay filter service",
     description="Internal filter service wrapping nerv-filter SDK.",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -55,6 +77,7 @@ class AnalyzeRequest(BaseModel):
     security_level: SecurityLevel = Field(SecurityLevel.MEDIUM, description="정책 강도")
     whitelist: list[str] | None = Field(None, description="요청별 화이트리스트 override")
     blacklist: list[str] | None = Field(None, description="요청별 블랙리스트 override")
+    use_ai_filter: bool = Field(True, description="이 호출에 2차(AI) 필터 사용 여부")
 
 
 class BatchRequest(BaseModel):
@@ -62,6 +85,7 @@ class BatchRequest(BaseModel):
     security_level: SecurityLevel = SecurityLevel.MEDIUM
     whitelist: list[str] | None = None
     blacklist: list[str] | None = None
+    use_ai_filter: bool = True
 
 
 class DetectedWordOut(BaseModel):
@@ -82,6 +106,20 @@ class AnalyzeResponse(BaseModel):
     score: float
     detected_words: list[DetectedWordOut]
     flags: FlagsOut
+
+
+class TrainOneRequest(BaseModel):
+    module_name: str = Field(..., examples=["sexual"])
+    text: str = Field(..., min_length=1)
+    label: int = Field(..., ge=0, le=1)
+    save: bool = Field(default=True)
+
+
+class TrainOneResponse(BaseModel):
+    module: str
+    loss: float
+    score_after_step: float
+    saved: bool
 
 
 # ─────────────────────────────────────────────
@@ -110,9 +148,11 @@ def _to_response(result) -> AnalyzeResponse:
 # ─────────────────────────────────────────────
 @app.get("/health")
 async def health(flt: Annotated[NervFilter, Depends(get_filter)]):
+    sp = getattr(flt, "_second_pass", None)
     return {
         "status": "ok",
         "dictionary_size": flt.get_dictionary_size(),
+        "second_pass_active": bool(sp and sp.is_active),
     }
 
 
@@ -120,10 +160,22 @@ async def health(flt: Annotated[NervFilter, Depends(get_filter)]):
 async def info(flt: Annotated[NervFilter, Depends(get_filter)]):
     from nerv_filter import __version__
 
+    sp = getattr(flt, "_second_pass", None)
+    sp_info = None
+    if sp is not None and sp.is_active:
+        sp_info = {
+            "active": True,
+            "models": list(getattr(sp._manager, "modules", {}).keys()),
+            "threshold": sp.config.threshold,
+        }
+    else:
+        sp_info = {"active": False}
+
     return {
         "sdk_version": __version__,
         "dictionary_size": flt.get_dictionary_size(),
         "security_level": flt.security_level.value,
+        "second_pass": sp_info,
     }
 
 
@@ -140,7 +192,12 @@ async def analyze(
     if req.security_level != flt.security_level:
         flt.security_level = req.security_level
 
-    result = flt.analyze(req.text, whitelist=req.whitelist, blacklist=req.blacklist)
+    result = flt.analyze(
+        req.text,
+        whitelist=req.whitelist,
+        blacklist=req.blacklist,
+        use_second_pass=req.use_ai_filter,
+    )
     return _to_response(result)
 
 
@@ -152,5 +209,38 @@ async def analyze_batch(
     if req.security_level != flt.security_level:
         flt.security_level = req.security_level
 
-    results = flt.analyze_batch(req.texts, whitelist=req.whitelist, blacklist=req.blacklist)
+    results = flt.analyze_batch(
+        req.texts,
+        whitelist=req.whitelist,
+        blacklist=req.blacklist,
+        use_second_pass=req.use_ai_filter,
+    )
     return [_to_response(r) for r in results]
+
+
+@app.post("/train-one", response_model=TrainOneResponse)
+async def train_one(
+    req: TrainOneRequest,
+    flt: Annotated[NervFilter, Depends(get_filter)],
+):
+    """2차 모듈 head 를 단일 샘플로 즉시 업데이트.
+
+    재학습 큐를 거치지 않고 즉시 학습 → 운영 환경에서는 사용 신중.
+    """
+    sp = getattr(flt, "_second_pass", None)
+    if sp is None or not sp.is_active:
+        raise HTTPException(status_code=503, detail="2차 필터가 활성화되지 않았습니다.")
+    try:
+        result = sp.update(req.module_name, req.text, req.label, save=req.save)
+        return TrainOneResponse(
+            module=result["module"],
+            loss=result["loss"],
+            score_after_step=result["score_after_step"],
+            saved=req.save,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"실시간 학습 중 오류: {e}")

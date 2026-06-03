@@ -44,6 +44,15 @@ public class BroadcastHistoryService {
      */
     private final ConcurrentHashMap<Long, Object> userLocks = new ConcurrentHashMap<>();
 
+    /**
+     * 사용자별 최근 본 메시지 ID 큐 — 같은 메시지가 여러 WS 세션으로 동시 수신되어
+     * record() 가 중복 호출되는 케이스 방지 (메인 페이지 + OBS Browser Source 동시 사용 등).
+     * LinkedHashMap 의 accessOrder 활용으로 LRU 비슷한 만료.
+     */
+    private static final int DEDUP_WINDOW = 200;
+    private final ConcurrentHashMap<Long, java.util.LinkedHashSet<String>> recentMsgIds =
+            new ConcurrentHashMap<>();
+
     /** self-injection — @Transactional proxy 호출용 (synchronized 바깥에서 트랜잭션 시작/커밋). */
     @Lazy
     @Autowired
@@ -58,6 +67,7 @@ public class BroadcastHistoryService {
      */
     public void record(
             Long ownerUserId,
+            String msgId,
             String source,
             String channelId,
             String author,
@@ -70,6 +80,20 @@ public class BroadcastHistoryService {
         if (ownerUserId == null) return; // 비로그인(글로벌 더미) 은 히스토리 안 남김
         Object lock = userLocks.computeIfAbsent(ownerUserId, k -> new Object());
         synchronized (lock) {
+            // dedup — 같은 사용자/같은 msgId 가 짧은 시간 내 두 번 들어오면 (다중 WS) 무시
+            if (msgId != null && !msgId.isBlank()) {
+                java.util.LinkedHashSet<String> seen = recentMsgIds
+                        .computeIfAbsent(ownerUserId, k -> new java.util.LinkedHashSet<>());
+                if (!seen.add(msgId)) {
+                    log.debug("[History] 중복 메시지 dedup: owner={} msgId={}", ownerUserId, msgId);
+                    return;
+                }
+                if (seen.size() > DEDUP_WINDOW) {
+                    java.util.Iterator<String> it = seen.iterator();
+                    it.next();
+                    it.remove();
+                }
+            }
             self.recordInternal(ownerUserId, source, channelId, author,
                     originalText, maskedText, action, score, detectedWords);
         }

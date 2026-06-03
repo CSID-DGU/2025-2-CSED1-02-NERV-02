@@ -11,13 +11,19 @@ public record FilterAnalyzeRequest(
         @NotBlank String text,
         @JsonProperty("security_level") String securityLevel,
         List<String> whitelist,
-        List<String> blacklist
+        List<String> blacklist,
+        @JsonProperty("use_ai_filter") Boolean useAiFilter
 ) {
     public FilterAnalyzeRequest(String text) {
-        this(text, "MEDIUM", null, null);
+        this(text, "MEDIUM", null, null, null);
     }
 
     public FilterAnalyzeRequest(String text, String securityLevel) {
-        this(text, securityLevel, null, null);
+        this(text, securityLevel, null, null, null);
+    }
+
+    public FilterAnalyzeRequest(String text, String securityLevel,
+                                List<String> whitelist, List<String> blacklist) {
+        this(text, securityLevel, whitelist, blacklist, null);
     }
 }

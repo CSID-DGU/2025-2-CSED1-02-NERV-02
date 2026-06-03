@@ -956,6 +956,55 @@ legend {
   font-weight: 600;
   color: var(--color-text);
 }
+/* AI 필터 토글 — 블랙리스트 아래 블록 */
+.ai-toggle-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0 2px;
+}
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.toggle-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.toggle-track {
+  width: 36px;
+  height: 20px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  position: relative;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+.toggle-switch input:checked + .toggle-track {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.toggle-switch input:checked + .toggle-track::after {
+  transform: translateX(16px);
+}
+.toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
 .dict-subtitle span {
   font-size: 11px;
   font-weight: 400;
