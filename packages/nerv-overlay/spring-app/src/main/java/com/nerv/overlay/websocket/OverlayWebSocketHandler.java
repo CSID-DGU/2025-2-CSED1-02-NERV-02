@@ -89,11 +89,13 @@ public class OverlayWebSocketHandler extends TextWebSocketHandler {
         }
 
         // 메시지 수신 시 filter-service 호출 → 클라이언트로 push
+        // token 을 클로저에 캡처해서 매 메시지마다 최신 config(B/W list 등) 를 다시 로드.
+        final String capturedToken = token;
         Disposable subscription = chatFetcher.subscribe(source, channelId, accessToken, refreshToken, raw -> {
-            handleIncomingMessage(session, raw);
+            handleIncomingMessage(session, capturedToken, raw);
         });
 
-        sessions.put(session.getId(), new SessionContext(session, config, subscription));
+        sessions.put(session.getId(), new SessionContext(session, capturedToken, subscription));
         log.info("[WS] open — sessionId={} token={} source={} channel={}",
                 session.getId(), token, source, channelId);
     }
@@ -107,10 +109,23 @@ public class OverlayWebSocketHandler extends TextWebSocketHandler {
         log.info("[WS] close — sessionId={} status={}", session.getId(), status);
     }
 
-    /** chat-fetcher 메시지 처리 — filter 호출 후 클라이언트로 보냄 */
-    private void handleIncomingMessage(WebSocketSession session, Map<String, Object> raw) {
+    /** chat-fetcher 메시지 처리 — filter 호출 후 클라이언트로 보냄.
+     *
+     * 매 호출마다 token 으로 최신 config 를 다시 조회해 B/W list / 보안수준 변경이
+     * WS 재연결 없이 즉시 반영되도록 한다.
+     */
+    private void handleIncomingMessage(WebSocketSession session, String token, Map<String, Object> raw) {
         SessionContext ctx = sessions.get(session.getId());
         if (ctx == null || !session.isOpen()) return;
+
+        // 매 메시지마다 최신 config — 설정 페이지 저장 후 즉시 반영됨
+        OverlayConfigDto config;
+        try {
+            config = configService.findByToken(token);
+        } catch (Exception e) {
+            log.warn("[WS] config 재로드 실패: {}", e.getMessage());
+            return;
+        }
 
         String id = String.valueOf(raw.getOrDefault("id", ""));
         String author = String.valueOf(raw.getOrDefault("author", "Anonymous"));
@@ -120,9 +135,10 @@ public class OverlayWebSocketHandler extends TextWebSocketHandler {
 
         filterClient.analyze(new FilterAnalyzeRequest(
                 content,
-                ctx.config.securityLevel(),
-                ctx.config.whitelist(),
-                ctx.config.blacklist()))
+                config.securityLevel(),
+                config.whitelist(),
+                config.blacklist(),
+                config.useAiFilter()))
                 .map(filterResp -> {
                     long tsFilterEnd = System.currentTimeMillis();
                     return new OverlayChatMessage(
@@ -143,7 +159,7 @@ public class OverlayWebSocketHandler extends TextWebSocketHandler {
                 .doOnSuccess(payload -> {
                     sendJson(session, payload);
                     // 로그인 사용자의 채팅이면 히스토리에 기록 (NORMAL/REVIEW 는 카운트만, 차단류는 본문도)
-                    Long ownerId = ctx.config.ownerUserId();
+                    Long ownerId = config.ownerUserId();
                     if (ownerId != null && payload != null) {
                         try {
                             String detected = payload.detectedWords().stream()
@@ -152,8 +168,9 @@ public class OverlayWebSocketHandler extends TextWebSocketHandler {
                                     .orElse(null);
                             historyService.record(
                                     ownerId,
-                                    ctx.config.source(),
-                                    ctx.config.channelId(),
+                                    payload.id(),                 // msgId — dedup 용
+                                    config.source(),
+                                    config.channelId(),
                                     payload.author(),
                                     payload.originalText(),
                                     payload.maskedText(),
@@ -194,5 +211,5 @@ public class OverlayWebSocketHandler extends TextWebSocketHandler {
         return path.substring(idx + 1);
     }
 
-    private record SessionContext(WebSocketSession session, OverlayConfigDto config, Disposable subscription) {}
+    private record SessionContext(WebSocketSession session, String token, Disposable subscription) {}
 }

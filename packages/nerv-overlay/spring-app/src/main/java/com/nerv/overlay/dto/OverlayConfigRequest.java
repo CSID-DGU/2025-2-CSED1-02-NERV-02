@@ -34,6 +34,9 @@ public record OverlayConfigRequest(
         @JsonProperty("show_score")
         Boolean showScore,
 
+        @JsonProperty("use_ai_filter")
+        Boolean useAiFilter,
+
         List<@NotBlank @Size(max = 100) String> whitelist,
         List<@NotBlank @Size(max = 100) String> blacklist
 ) {}

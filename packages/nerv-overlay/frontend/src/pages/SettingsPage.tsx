@@ -10,6 +10,7 @@ type FormState = {
   block_display_mode: BlockDisplayMode
   placeholder_text: string
   show_score: boolean
+  use_ai_filter: boolean
   whitelist: string[]
   blacklist: string[]
 }
@@ -19,6 +20,7 @@ const DEFAULTS: FormState = {
   block_display_mode: 'MASK',
   placeholder_text: '[필터됨]',
   show_score: false,
+  use_ai_filter: true,
   whitelist: [],
   blacklist: [],
 }
@@ -40,6 +42,7 @@ export function SettingsPage() {
         block_display_mode: existing.block_display_mode,
         placeholder_text: existing.placeholder_text,
         show_score: existing.show_score,
+        use_ai_filter: existing.use_ai_filter,
         whitelist: existing.whitelist,
         blacklist: existing.blacklist,
       })
@@ -150,6 +153,30 @@ export function SettingsPage() {
               onChange={(words) => setForm({ ...form, blacklist: words })}
               placeholder="예: 특정닉네임"
             />
+          </div>
+
+          <div className="dict-group">
+            <h3 className="dict-subtitle">
+              AI 모듈 (2차 필터링) <span>사전 매칭으로 잡히지 않는 표현을 학습된 모델로 추가 탐지</span>
+            </h3>
+            <div className="ai-toggle-row">
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.use_ai_filter}
+                  onChange={(e) => setForm({ ...form, use_ai_filter: e.target.checked })}
+                />
+                <span className="toggle-track" aria-hidden />
+                <span className="toggle-label">
+                  {form.use_ai_filter ? 'AI 필터 사용' : 'AI 필터 끔'}
+                </span>
+              </label>
+              <p className="hint" style={{ margin: 0, fontSize: 11 }}>
+                {form.use_ai_filter
+                  ? '욕설·성적·스팸·정치·개인정보·비판·가족 7개 카테고리 분류기로 2차 검사합니다. 1차에서 이미 차단된 경우 호출하지 않습니다.'
+                  : '2차 AI 모델을 건너뜁니다. 1차(사전+형태소) 필터만 동작합니다.'}
+              </p>
+            </div>
           </div>
         </section>
 

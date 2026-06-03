@@ -63,6 +63,11 @@ public class OverlayConfig {
     @Builder.Default
     private Boolean showScore = false;
 
+    /** 2차(AI) 필터 사용 여부 — 사용자별 토글. false 면 1차만 동작. */
+    @Column(name = "use_ai_filter", nullable = false)
+    @Builder.Default
+    private Boolean useAiFilter = true;
+
     @Column(name = "style_config_json", columnDefinition = "TEXT")
     private String styleConfigJson;
 

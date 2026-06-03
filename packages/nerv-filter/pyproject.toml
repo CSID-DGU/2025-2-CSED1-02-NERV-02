@@ -36,7 +36,13 @@ dependencies = [
 
 [project.optional-dependencies]
 cli = ["click>=8.0"]
-ai = ["openai>=1.0"]
+# 2차 필터 (KcBERT + attention head) — 선택 설치. 1차만 쓰면 미설치로 가볍게 유지.
+# torch >= 2.6.0: 학습된 head 체크포인트(.pt)가 새 직렬화 포맷.
+ai = [
+    "torch>=2.6.0",
+    "transformers>=4.30",
+    "huggingface-hub>=0.16",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
@@ -57,10 +63,14 @@ Repository = "https://github.com/CSID-DGU/2025-2-CSED1-02-NERV-02"
 path = "src/nerv_filter/_version.py"
 
 [tool.hatch.build.targets.wheel]
+# src/nerv_filter/ 안의 모든 파일 (.py, dict/*.json, models/**) 이 자동 포함된다.
 packages = ["src/nerv_filter"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"src/nerv_filter/dict/default_dic.json" = "nerv_filter/dict/default_dic.json"
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/nerv_filter",
+    "README.md",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

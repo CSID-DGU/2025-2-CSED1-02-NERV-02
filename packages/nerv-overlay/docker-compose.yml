@@ -42,12 +42,22 @@ services:
     restart: unless-stopped
     ports:
       - "8001:8001"
+    environment:
+      # 2차 필터 (KcBERT + per-category attention head).
+      # 첫 실행 시 SDK 동봉 attention head 로드 + HF 에서 KcBERT large 다운로드.
+      # SECOND_PASS_ENABLED=false 면 강제로 1차만 동작.
+      SECOND_PASS_ENABLED: ${SECOND_PASS_ENABLED:-true}
+      ENABLED_MODELS: ${ENABLED_MODELS:-ALL}          # ALL = 7개 카테고리 전부
+      SECOND_PASS_THRESHOLD: ${SECOND_PASS_THRESHOLD:-0.8}
+      SECOND_PASS_MAX_LENGTH: ${SECOND_PASS_MAX_LENGTH:-128}
+      SECOND_PASS_HF_REPO_ID: ${SECOND_PASS_HF_REPO_ID:-beomi/kcbert-large}
+      HF_TOKEN: ${HF_TOKEN:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health').read()"]
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 60s   # Kiwi 로딩 시간
+      start_period: 120s   # Kiwi + (2차 활성 시) 모델 로딩 시간
 
   chat-fetcher:
     build:

@@ -94,6 +94,24 @@ filter-service Dockerfile 은 로컬 SDK (`packages/nerv-filter`) 를 build 시 
 4. public domain 생성 안 함
 5. **Variables**: `PORT=8001`
 
+#### 2차 AI 필터 (선택) — KcBERT 분류기
+
+filter-service 에 다음 변수를 추가하면 1차 + 2차(AI) 가 동작합니다. **안 넣으면 1차만** (안전 기본값).
+
+```env
+SECOND_PASS_ENABLED=true
+ENABLED_MODELS=basic,sexual,spam        # 켤 모델 (추가는 여기에 politics,pii,criticism)
+HF_MODEL_OWNER=<huggingface owner>
+HF_TOKEN=<huggingface token>
+SECOND_PASS_THRESHOLD=0.8               # 이 값 이상이면 탐지
+SECOND_PASS_FP16=true                   # CPU 면 자동 무시(fp32)
+```
+
+> ⚠️ **메모리**: 모델 1개당 ~0.4GB(+torch ~0.7GB). 6개 전부 ≈ 2.4GB RAM → Railway 사용량 과금 증가.
+> 핵심 2~3개(basic/sexual/spam)로 시작 권장. `ENABLED_MODELS` 에 이름만 추가하면 확장 (코드 변경 없음).
+>
+> **장애 대비 (3중 폴백)**: ① `SECOND_PASS_ENABLED=false` 킬스위치 → 1차만 ② 모델 로드 실패 → 자동 1차만 ③ 추론 오류 → 해당 메시지만 1차 결과. 어떤 경우든 서비스는 계속 동작.
+
 ### 1-5. CHZZK redirect_uri 등록
 
 CHZZK 개발자 센터 → 내 앱 → **Redirect URI** 에 추가:

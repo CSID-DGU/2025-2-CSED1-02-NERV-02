@@ -48,6 +48,7 @@ public class OverlayConfigService {
                 .blockDisplayMode(req.blockDisplayMode() != null ? req.blockDisplayMode() : "MASK")
                 .placeholderText(req.placeholderText() != null ? req.placeholderText() : "[필터됨]")
                 .showScore(req.showScore() != null ? req.showScore() : false)
+                .useAiFilter(req.useAiFilter() != null ? req.useAiFilter() : true)
                 .build();
 
         applyDictionary(entity, req.whitelist(), req.blacklist());
@@ -101,6 +102,7 @@ public class OverlayConfigService {
                         "MASK",         // block_display_mode
                         "[필터됨]",      // placeholder_text
                         false,          // show_score
+                        true,           // use_ai_filter
                         List.of(),      // whitelist
                         List.of()       // blacklist
                 )));
@@ -161,6 +163,7 @@ public class OverlayConfigService {
         if (req.blockDisplayMode() != null) entity.setBlockDisplayMode(req.blockDisplayMode());
         if (req.placeholderText() != null) entity.setPlaceholderText(req.placeholderText());
         if (req.showScore() != null) entity.setShowScore(req.showScore());
+        if (req.useAiFilter() != null) entity.setUseAiFilter(req.useAiFilter());
 
         // 사전은 들어왔으면 통째로 교체 (단순 모델)
         if (req.whitelist() != null || req.blacklist() != null) {

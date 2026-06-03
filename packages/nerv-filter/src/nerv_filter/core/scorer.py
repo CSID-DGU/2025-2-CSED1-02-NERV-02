@@ -1,12 +1,13 @@
 """위험도 점수 계산기.
 
-3-bucket 스펙. 보안수준 비의존적 base score 만 계산한다.
+4-bucket 스펙. 보안수준 비의존적 base score 만 계산한다.
 PolicyManager 가 이 결과로 액션을 결정한다.
 
 Bucket:
 - Normal  0~25  : 검출 단어 없음 (초성+특수문자 비율 기반)
 - Caution 26~50 : SYSTEM 사전만 검출
 - Warn    51~75 : BLACKLIST 검출 포함
+- AI    : 사전 검출 없이 AI(2차) 만 트리거된 경우, 사용된 threshold 초과 모듈들의 평균 점수.
 + trigger: +25
 """
 from __future__ import annotations
@@ -64,11 +65,20 @@ class RiskScorer:
         self,
         filter_result: dict[str, Any],
         trigger_keywords: frozenset[str] | None = None,
+        ai_threshold: float = 0.8,
     ) -> dict[str, Any]:
         triggers = trigger_keywords or frozenset()
 
         detected_words = filter_result.get("detected_words", [])
         original_text = filter_result.get("original_text", "")
+        second_pass_scores: dict[str, float] = filter_result.get("second_pass_scores") or {}
+
+        # threshold 넘긴 AI 모듈만 채택
+        ai_exceeded: dict[str, float] = {
+            module: float(score)
+            for module, score in second_pass_scores.items()
+            if float(score) >= ai_threshold
+        }
 
         has_blacklist = any(
             item["type"] == WordType.USER_BLACKLIST for item in detected_words
@@ -81,6 +91,16 @@ class RiskScorer:
         has_trigger = (has_system or has_blacklist) and text_has_trigger
 
         non_space_len = sum(1 for c in original_text if not c.isspace())
+
+        # 사전 검출 없고 AI 만 트리거 → AI 점수 평균
+        if not detected_words and ai_exceeded:
+            ai_avg = sum(ai_exceeded.values()) / len(ai_exceeded)
+            score_100 = ai_avg * 100.0
+            return self._pack(
+                score_100, False, False, False,
+                ai_modules=list(ai_exceeded.keys()),
+                is_ai_detected=True,
+            )
 
         if not detected_words:
             score_100 = self._normal_bucket(original_text, non_space_len)
@@ -131,6 +151,8 @@ class RiskScorer:
         has_blacklist: bool,
         has_system: bool,
         has_trigger: bool,
+        ai_modules: list[str] | None = None,
+        is_ai_detected: bool = False,
     ) -> dict[str, Any]:
         score_100 = max(0.0, min(score_100, 100.0))
         return {
@@ -138,4 +160,6 @@ class RiskScorer:
             "has_blacklist": has_blacklist,
             "has_general": has_system,
             "has_trigger": has_trigger,
+            "ai_modules": ai_modules or [],
+            "is_ai_detected": is_ai_detected,
         }
