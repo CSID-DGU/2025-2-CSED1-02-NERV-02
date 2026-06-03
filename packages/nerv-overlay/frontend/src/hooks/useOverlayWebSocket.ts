@@ -26,11 +26,39 @@ interface Options {
   max?: number
   /** 측정용 누적 버퍼 사용 여부 (true 면 모든 메시지 보존) */
   collectAll?: boolean
+  /**
+   * sessionStorage 캐시 키 — 지정하면 mount 시 복원, 새 메시지마다 저장.
+   * 다른 탭/라우트로 이동 후 다시 돌아와도 (또는 새로고침 후) 이전 메시지 유지.
+   */
+  persistKey?: string
+}
+
+const MAX_PERSIST = 100
+
+function readPersisted(key: string): ChatMessage[] {
+  try {
+    const raw = sessionStorage.getItem(key)
+    if (!raw) return []
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? (arr as ChatMessage[]) : []
+  } catch {
+    return []
+  }
+}
+
+function writePersisted(key: string, msgs: ChatMessage[]) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(msgs.slice(-MAX_PERSIST)))
+  } catch {
+    // quota exceeded 등 — 무시
+  }
 }
 
 export function useOverlayWebSocket(token: string | undefined, opts: Options = {}) {
-  const { max = 30, collectAll = false } = opts
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const { max = 30, collectAll = false, persistKey } = opts
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    persistKey ? readPersisted(persistKey).slice(-max) : [],
+  )
   const [allMessages, setAllMessages] = useState<ChatMessage[]>([])
   const [state, setState] = useState<ConnectionState>('connecting')
   const wsRef = useRef<WebSocket | null>(null)
@@ -48,7 +76,11 @@ export function useOverlayWebSocket(token: string | undefined, opts: Options = {
       const ts_received = performance.timeOrigin + performance.now()
       const data = JSON.parse(ev.data) as Omit<ChatMessage, 'ts_received'>
       const msg: ChatMessage = { ...data, ts_received }
-      setMessages((prev) => [...prev, msg].slice(-max))
+      setMessages((prev) => {
+        const next = [...prev, msg].slice(-max)
+        if (persistKey) writePersisted(persistKey, next)
+        return next
+      })
       if (collectAll) {
         setAllMessages((prev) => [...prev, msg])
       }
@@ -84,7 +116,7 @@ export function useOverlayWebSocket(token: string | undefined, opts: Options = {
       if (reconnectTimer) clearTimeout(reconnectTimer)
       if (ws) ws.close()
     }
-  }, [token, max, collectAll])
+  }, [token, max, collectAll, persistKey])
 
   /** 메시지가 DOM 에 그려진 시각을 기록 (측정용) */
   const markRendered = (id: string) => {

@@ -335,7 +335,9 @@ a:hover { text-decoration: underline; }
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 280px);
+  /* 메시지가 적어도 처음부터 최대 크기로 유지 */
+  height: calc(100vh - 280px);
+  min-height: 360px;
 }
 .main-message-list {
   flex: 1;
@@ -644,6 +646,13 @@ legend {
   font-size: 16px;
   padding: 16px;
   font-family: var(--font-sans);
+  /* OBS Browser Source 의 transparent viewport 전체를 채워서,
+     채팅이 적어도 컨테이너는 항상 풀-사이즈로 유지 → 메시지는 하단부터 쌓임 */
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 .overlay-header {
   font-size: 11px;
@@ -651,12 +660,23 @@ legend {
   background: rgba(0, 0, 0, 0.5);
   padding: 4px 10px;
   border-radius: var(--radius-sm);
-  display: inline-block;
+  align-self: flex-start;
   margin-bottom: 8px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 .overlay-loading, .overlay-error { padding: 16px; font-size: 12px; color: rgba(255,255,255,0.9); }
-.overlay-message-list { display: flex; flex-direction: column; gap: 6px; }
+.overlay-message-list {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;          /* OBS 송출엔 스크롤바 보이면 안 됨 */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* 최신 메시지가 하단, 오래된 건 위로 밀려 사라지듯 페이드 */
+  justify-content: flex-end;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 64px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 64px);
+}
 
 /* 채팅 버블 — 이름 상단 / 채팅 하단, 둥근 직사각형, 반투명 다크 */
 .chat-line {

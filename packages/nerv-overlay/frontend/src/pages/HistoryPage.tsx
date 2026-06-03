@@ -52,6 +52,18 @@ export function HistoryPage() {
   )
 }
 
+/**
+ * 클라이언트에서 본 "진행 중" 판정 — 백엔드 idle 종료가 늦더라도
+ * last_message_at 이 N분 전이면 종료된 것으로 표시.
+ */
+const CLIENT_ACTIVE_CUTOFF_MS = 3 * 60 * 1000
+function displayIsActive(s: BroadcastSession): boolean {
+  if (!s.is_active) return false
+  if (!s.last_message_at) return true
+  const last = new Date(s.last_message_at).getTime()
+  return Date.now() - last < CLIENT_ACTIVE_CUTOFF_MS
+}
+
 function SessionBlock({
   session,
   open,
@@ -61,12 +73,13 @@ function SessionBlock({
   open: boolean
   onToggle: () => void
 }) {
+  const isActive = displayIsActive(session)
   return (
     <section className={open ? 'history-block history-block-open' : 'history-block'}>
       <button type="button" className="history-block-head" onClick={onToggle}>
         <div className="history-block-title">
           <span className="history-date">{formatDate(session.started_at)}</span>
-          {session.is_active && <span className="history-live-pill">● 진행 중</span>}
+          {isActive && <span className="history-live-pill">● 진행 중</span>}
         </div>
         <div className="history-block-meta">
           <span>총 {session.message_count.toLocaleString()}건</span>
@@ -87,24 +100,35 @@ function SessionMessages({ sessionId }: { sessionId: number }) {
     queryFn: () => historyApi.messages(sessionId),
   })
 
-  // 낙관적 갱신 — 한 번 선택하면 영구히 true 유지
-  const selectMut = useMutation({
-    mutationFn: (id: number) => historyApi.select(id),
-    onMutate: async (id) => {
-      const key = ['history-messages', sessionId]
-      await qc.cancelQueries({ queryKey: key })
-      const prev = qc.getQueryData<FilteredMessage[]>(key)
-      qc.setQueryData<FilteredMessage[]>(key, (old) =>
-        (old ?? []).map((m) => (m.id === id ? { ...m, selected_for_relearn: true } : m)),
+  /**
+   * 로컬 체크 상태 — 사용자가 자유롭게 토글 가능.
+   * 서버에서 이미 selected_for_relearn=true 인 항목은 "lock" 으로 분류돼
+   * 체크가 풀리지 않음.
+   * 재학습 버튼을 누르면 여기 담긴 ID 들이 서버로 일괄 commit 됨.
+   */
+  const [pendingIds, setPendingIds] = useState<Set<number>>(new Set())
+
+  /** 재학습 버튼 — 선택된 항목들을 서버에 batch commit → DB 영구 고정 */
+  const submitMut = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const results = await Promise.allSettled(
+        ids.map((id) => historyApi.select(id)),
       )
-      return { prev }
+      const failed = results.filter((r) => r.status === 'rejected').length
+      return { total: ids.length, failed }
     },
-    onError: (_e, _id, ctx) => {
-      if (ctx?.prev) qc.setQueryData(['history-messages', sessionId], ctx.prev)
+    onSuccess: ({ total, failed }) => {
+      setPendingIds(new Set())
+      qc.invalidateQueries({ queryKey: ['history-messages', sessionId] })
+      if (failed > 0) {
+        alert(`${total}건 중 ${failed}건 실패. 다시 시도해 주세요.`)
+      } else {
+        alert(`${total}건이 재학습 후보로 고정되었습니다.\n(현재 재학습 실행은 아직 활성화되지 않았습니다.)`)
+      }
     },
   })
 
-  const selectedCount = useMemo(
+  const lockedCount = useMemo(
     () => messagesQ.data?.filter((m) => m.selected_for_relearn).length ?? 0,
     [messagesQ.data],
   )
@@ -112,6 +136,21 @@ function SessionMessages({ sessionId }: { sessionId: number }) {
   if (messagesQ.isLoading) return <p className="hint" style={{ padding: '12px 16px' }}>불러오는 중...</p>
   if (!messagesQ.data || messagesQ.data.length === 0) {
     return <p className="hint" style={{ padding: '12px 16px' }}>이 방송에서 필터링된 메시지가 없습니다.</p>
+  }
+
+  const togglePending = (id: number) => {
+    setPendingIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const onSubmit = () => {
+    const ids = Array.from(pendingIds)
+    if (ids.length === 0) return
+    submitMut.mutate(ids)
   }
 
   return (
@@ -127,8 +166,9 @@ function SessionMessages({ sessionId }: { sessionId: number }) {
           </tr>
         </thead>
         <tbody>
-          {messagesQ.data.map((m) => {
+          {messagesQ.data.map((m: FilteredMessage) => {
             const locked = m.selected_for_relearn
+            const checked = locked || pendingIds.has(m.id)
             return (
               <tr key={m.id} className={locked ? 'history-row-locked' : ''}>
                 <td className="history-time">{formatTime(m.created_at)}</td>
@@ -140,10 +180,12 @@ function SessionMessages({ sessionId }: { sessionId: number }) {
                 <td style={{ textAlign: 'center' }}>
                   <input
                     type="checkbox"
-                    checked={locked}
-                    disabled={locked || selectMut.isPending}
-                    onChange={() => !locked && selectMut.mutate(m.id)}
-                    title={locked ? '이미 선택된 항목 (영구 유지)' : '재학습 후보로 선택'}
+                    checked={checked}
+                    disabled={locked || submitMut.isPending}
+                    onChange={() => !locked && togglePending(m.id)}
+                    title={locked
+                      ? '이미 재학습 후보로 전송된 항목 (해제 불가)'
+                      : '재학습 후보로 선택'}
                   />
                 </td>
               </tr>
@@ -153,14 +195,20 @@ function SessionMessages({ sessionId }: { sessionId: number }) {
       </table>
 
       <div className="history-actions">
-        <span className="hint">선택 {selectedCount}건 (한 번 선택하면 해제할 수 없습니다)</span>
+        <span className="hint">
+          선택 {pendingIds.size}건 · 고정 {lockedCount}건
+          {pendingIds.size > 0 && ' (재학습 후 해제 불가)'}
+        </span>
         <button
           type="button"
           className="btn btn-primary"
-          disabled
-          title="재학습 기능은 아직 활성화되지 않았습니다."
+          disabled={pendingIds.size === 0 || submitMut.isPending}
+          onClick={onSubmit}
+          title={pendingIds.size === 0
+            ? '선택된 항목이 없습니다.'
+            : '선택한 메시지를 재학습 후보로 전송합니다.'}
         >
-          🔒 재학습
+          {submitMut.isPending ? '전송 중...' : `🔒 재학습 (${pendingIds.size}건)`}
         </button>
       </div>
     </div>

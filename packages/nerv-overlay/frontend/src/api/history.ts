@@ -5,6 +5,7 @@ export interface BroadcastSession {
   source: string
   channel_id: string | null
   started_at: string
+  last_message_at: string | null
   ended_at: string | null
   message_count: number
   filtered_count: number
