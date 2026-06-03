@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { overlaysApi } from '../api/overlays'
-import { useOverlayWebSocket, type ChatMessage } from '../hooks/useOverlayWebSocket'
+import { type ChatMessage } from '../hooks/useOverlayWebSocket'
+import { useChatStream } from '../stream/ChatStreamProvider'
 import { useLatencyStats } from '../hooks/useLatencyStats'
 import { LatencyGauge } from '../components/LatencyGauge'
 import { useAuth } from '../auth/AuthContext'
@@ -25,8 +26,9 @@ export function MainPage() {
     queryFn: overlaysApi.active,
   })
 
-  const { messages, allMessages, state, markRendered, clearCollected } =
-    useOverlayWebSocket(config?.overlay_token, { max: 50, collectAll: true })
+  // App 레벨 ChatStreamProvider 에서 잡고 있는 단일 스트림을 공유.
+  // 다른 탭(설정/내정보/히스토리) 갔다 와도 messages 가 유지됨.
+  const { messages, allMessages, state, markRendered, clearCollected } = useChatStream()
 
   const { samples, stats } = useLatencyStats(allMessages)
 
