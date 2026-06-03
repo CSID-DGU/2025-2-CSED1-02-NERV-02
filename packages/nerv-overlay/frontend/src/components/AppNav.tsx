@@ -22,15 +22,9 @@ export function AppNav() {
           </Link>
           <div className="app-nav-spacer" />
 
-          <NavLink
-            to="/settings"
-            className={pathname === '/settings' ? 'btn btn-primary' : 'btn'}
-          >
-            ⚙ 설정
-          </NavLink>
-
           {!loading && (user ? (
             <>
+              {/* 순서: 내정보 → 히스토리 → 설정 → 로그아웃 */}
               <NavLink
                 to="/profile"
                 className={pathname === '/profile' ? 'btn btn-primary' : 'btn'}
@@ -38,12 +32,30 @@ export function AppNav() {
               >
                 👤 내정보
               </NavLink>
+              <NavLink
+                to="/history"
+                className={pathname.startsWith('/history') ? 'btn btn-primary' : 'btn'}
+              >
+                📜 히스토리
+              </NavLink>
+              <NavLink
+                to="/settings"
+                className={pathname === '/settings' ? 'btn btn-primary' : 'btn'}
+              >
+                ⚙ 설정
+              </NavLink>
               <button type="button" className="btn" onClick={logout}>
                 로그아웃
               </button>
             </>
           ) : (
             <>
+              <NavLink
+                to="/settings"
+                className={pathname === '/settings' ? 'btn btn-primary' : 'btn'}
+              >
+                ⚙ 설정
+              </NavLink>
               <button type="button" className="btn" onClick={openLogin}>
                 로그인
               </button>

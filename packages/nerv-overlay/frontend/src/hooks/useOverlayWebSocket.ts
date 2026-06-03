@@ -39,26 +39,51 @@ export function useOverlayWebSocket(token: string | undefined, opts: Options = {
     if (!token) return
 
     const url = `${WS_BASE_URL}/ws/overlay/${token}`
+    let alive = true
+    let ws: WebSocket | null = null
+    let reconnectTimer: number | null = null
+    let attempts = 0
 
-    const ws = new WebSocket(url)
-    wsRef.current = ws
-
-    ws.onopen = () => setState('open')
-    ws.onclose = () => setState('closed')
-    ws.onerror = () => setState('error')
-
-    ws.onmessage = (ev) => {
+    const handleMessage = (ev: MessageEvent) => {
       const ts_received = performance.timeOrigin + performance.now()
       const data = JSON.parse(ev.data) as Omit<ChatMessage, 'ts_received'>
       const msg: ChatMessage = { ...data, ts_received }
-
       setMessages((prev) => [...prev, msg].slice(-max))
       if (collectAll) {
         setAllMessages((prev) => [...prev, msg])
       }
     }
 
-    return () => ws.close()
+    function connect() {
+      if (!alive) return
+      setState('connecting')
+      ws = new WebSocket(url)
+      wsRef.current = ws
+
+      ws.onopen = () => {
+        attempts = 0
+        setState('open')
+      }
+      ws.onclose = () => {
+        setState('closed')
+        if (!alive) return
+        // 끊김 자동 재연결 — 방송 시작/끝, 토큰 갱신, 네트워크 일시 끊김 등에 대비
+        // 1s → 2s → 4s → 8s (최대 8초) backoff
+        attempts += 1
+        const delay = Math.min(8000, 1000 * Math.pow(2, attempts - 1))
+        reconnectTimer = window.setTimeout(connect, delay)
+      }
+      ws.onerror = () => setState('error')
+      ws.onmessage = handleMessage
+    }
+
+    connect()
+
+    return () => {
+      alive = false
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      if (ws) ws.close()
+    }
   }, [token, max, collectAll])
 
   /** 메시지가 DOM 에 그려진 시각을 기록 (측정용) */
