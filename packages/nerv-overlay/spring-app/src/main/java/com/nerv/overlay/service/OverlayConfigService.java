@@ -5,6 +5,8 @@ import com.nerv.overlay.dto.OverlayConfigRequest;
 import com.nerv.overlay.entity.OverlayConfig;
 import com.nerv.overlay.entity.OverlayDictionary;
 import com.nerv.overlay.repository.OverlayConfigRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +26,14 @@ import java.util.Set;
 public class OverlayConfigService {
 
     private final OverlayConfigRepository repository;
+
+    /**
+     * dictionary 교체 시 DELETE 가 INSERT 보다 먼저 실행되도록 명시적 flush 가 필요.
+     * Hibernate 의 기본 SQL 실행 순서가 INSERT → UPDATE → DELETE 라서, orphanRemoval 의
+     * DELETE 가 같은 (overlay_id, word, list_type) UNIQUE 키의 새 INSERT 와 충돌한다.
+     */
+    @PersistenceContext
+    private EntityManager entityManager;
 
     /**
      * 사용자에게 노출되는 OBS Browser Source URL 의 host.
@@ -165,15 +175,18 @@ public class OverlayConfigService {
         if (req.showScore() != null) entity.setShowScore(req.showScore());
         if (req.useAiFilter() != null) entity.setUseAiFilter(req.useAiFilter());
 
-        // 사전은 들어왔으면 통째로 교체 (단순 모델)
+        // 사전 교체: clear() 의 DELETE 와 applyDictionary() 의 INSERT 가 같은 트랜잭션에 들어가면
+        // Hibernate 가 INSERT 를 먼저 실행해 UNIQUE 제약 (overlay_id, word, list_type) 과 충돌한다.
+        // clear() 직후 flush() 로 DELETE 를 강제 실행해 순서 문제를 해결.
         if (req.whitelist() != null || req.blacklist() != null) {
             entity.getDictionary().clear();
+            entityManager.flush();
             applyDictionary(entity,
                     req.whitelist() != null ? req.whitelist() : List.of(),
                     req.blacklist() != null ? req.blacklist() : List.of());
         }
 
-        log.info("[OverlayConfig] 수정: id={}", entity.getId());
+        log.info("[OverlayConfig] 수정: id={} use_ai_filter={}", entity.getId(), entity.getUseAiFilter());
         return OverlayConfigDto.from(entity, overlayBaseUrl);
     }
 

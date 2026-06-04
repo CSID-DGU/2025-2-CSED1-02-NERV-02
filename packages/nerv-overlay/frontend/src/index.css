@@ -1271,6 +1271,12 @@ legend {
 .history-pill.action-partial_mask { background: rgba(249, 115, 22, 0.18); color: #fdba74; }
 .history-pill.action-full_block   { background: var(--color-danger-soft); color: var(--color-danger-text); }
 
+/* 필터링 유형 칩 — type 분류 (블랙리스트/AI/시스템) */
+.history-pill-group { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.history-pill.pill-blacklist { background: var(--color-danger-soft); color: var(--color-danger-text); }
+.history-pill.pill-ai        { background: rgba(99, 102, 241, 0.18); color: #c7d2fe; }
+.history-pill.pill-system    { background: rgba(148, 163, 184, 0.18); color: #cbd5e1; }
+
 .history-actions {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px;

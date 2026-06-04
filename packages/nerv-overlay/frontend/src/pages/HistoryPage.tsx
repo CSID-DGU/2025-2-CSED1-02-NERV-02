@@ -161,7 +161,7 @@ function SessionMessages({ sessionId }: { sessionId: number }) {
             <th>시각</th>
             <th>닉네임</th>
             <th>내용</th>
-            <th>판정</th>
+            <th>필터링 유형</th>
             <th style={{ textAlign: 'center' }}>선택</th>
           </tr>
         </thead>
@@ -175,7 +175,7 @@ function SessionMessages({ sessionId }: { sessionId: number }) {
                 <td className="history-author">{m.author}</td>
                 <td className="history-content">{m.original_text}</td>
                 <td className="history-action">
-                  <span className={`history-pill action-${m.action.toLowerCase()}`}>{m.action}</span>
+                  <FilterTypePills detectedWords={m.detected_words} fallbackAction={m.action} />
                 </td>
                 <td style={{ textAlign: 'center' }}>
                   <input
@@ -213,6 +213,73 @@ function SessionMessages({ sessionId }: { sessionId: number }) {
       </div>
     </div>
   )
+}
+
+/**
+ * detected_words 의 type 들을 사용자 친화적 분류 칩으로 변환.
+ *
+ * detected_words 직렬화 형식: "word|TYPE,word|TYPE" (백엔드 OverlayWebSocketHandler).
+ * 우선순위: 블랙리스트 > AI > 시스템.
+ */
+type PillKind = 'blacklist' | 'system' | 'ai'
+
+interface Pill {
+  kind: PillKind
+  label: string
+}
+
+function FilterTypePills({
+  detectedWords,
+  fallbackAction,
+}: {
+  detectedWords: string | null
+  fallbackAction: string
+}) {
+  const pills = parseFilterPills(detectedWords)
+
+  if (pills.length === 0) {
+    // detected_words 가 비어있지만 히스토리에 남았다면 폴백 (예: 옛 데이터)
+    return <span className={`history-pill action-${fallbackAction.toLowerCase()}`}>{fallbackAction}</span>
+  }
+
+  return (
+    <span className="history-pill-group">
+      {pills.map((p, i) => (
+        <span key={`${p.kind}-${p.label}-${i}`} className={`history-pill pill-${p.kind}`}>
+          {p.label}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function parseFilterPills(serialized: string | null): Pill[] {
+  if (!serialized) return []
+
+  let hasBlacklist = false
+  let hasSystem = false
+  const aiCategories = new Set<string>()
+
+  for (const entry of serialized.split(',')) {
+    const [word, typeRaw] = entry.split('|')
+    if (!typeRaw) continue
+    const type = typeRaw.trim().toUpperCase()
+    if (type === 'USER_BLACKLIST') hasBlacklist = true
+    else if (type === 'SYSTEM_KEYWORD') hasSystem = true
+    else if (type.startsWith('AI_')) {
+      // AI_BASIC, AI_SEXUAL 등 → 카테고리는 word 자체 (engine.py 에서 cat 을 word 로 넣음)
+      aiCategories.add(word?.trim() || type.replace('AI_', '').toLowerCase())
+    }
+  }
+
+  const out: Pill[] = []
+  if (hasBlacklist) out.push({ kind: 'blacklist', label: '블랙리스트' })
+  if (aiCategories.size > 0) {
+    const cats = Array.from(aiCategories).join(', ')
+    out.push({ kind: 'ai', label: `AI: ${cats}` })
+  }
+  if (hasSystem) out.push({ kind: 'system', label: '시스템' })
+  return out
 }
 
 function formatDate(iso: string) {
