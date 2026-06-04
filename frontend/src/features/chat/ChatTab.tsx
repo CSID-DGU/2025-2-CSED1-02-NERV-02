@@ -69,6 +69,7 @@ const AI_MODULE_LABELS: Record<string, string> = {
   criticism: '비난/협박',
   basic: '기본 유해',
   sexual: '성적',
+  family: '가족 비하',
 };
 
 const CommentRow = ({
@@ -140,7 +141,7 @@ const CommentRow = ({
         {isReview && (
           <div className="flex items-center gap-1 mt-1">
             <span className="text-[10px] px-1.5 py-0.5 bg-yellow-200 text-yellow-800 rounded font-medium">
-              사용자 검토가 필요합니다
+              {hasAiModules ? 'AI가 유해 가능성을 감지했습니다' : '사용자 검토가 필요합니다'}
             </span>
           </div>
         )}

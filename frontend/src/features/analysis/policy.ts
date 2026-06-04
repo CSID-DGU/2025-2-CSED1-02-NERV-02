@@ -24,7 +24,7 @@ const MATRIX: Record<SecurityLevel, Record<Category, ModerationAction>> = {
 
 const AI_MATRIX: Record<SecurityLevel, ModerationAction> = {
   LOW: 'REVIEW',
-  MEDIUM: 'FULL_BLOCK',
+  MEDIUM: 'PARTIAL_MASK',
   HIGH: 'FULL_BLOCK',
 };
 
@@ -70,13 +70,17 @@ export const derivePolicy = (
   const hasAiModules = (comment.ai_modules ?? []).length > 0;
 
   // 2차 AI 탐지 결과
-  // AI는 특정 단어 위치를 모르므로 PARTIAL_MASK를 사용하지 않는다.
   if (hasAiModules) {
     const action = AI_MATRIX[securityLevel];
 
     return {
       action,
-      processed_text: action === 'FULL_BLOCK' ? '' : comment.text,
+      processed_text:
+        action === 'FULL_BLOCK'
+          ? ''
+          : action === 'PARTIAL_MASK'
+            ? comment.masked_text
+            : comment.text,
       score,
     };
   }

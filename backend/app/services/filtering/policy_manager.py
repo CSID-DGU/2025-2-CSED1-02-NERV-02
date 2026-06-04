@@ -17,6 +17,7 @@ _AI_THRESHOLDS = {
     "criticism": 0.8,
     "basic": 0.8,
     "sexual": 0.8,
+    "family": 0.8,
 }
 
 # 매트릭스: [보안모드][검출카테고리] → 액션
@@ -40,7 +41,7 @@ _MATRIX: Dict[SecurityLevel, Dict[str, ModerationAction]] = {
 
 _AI_MATRIX: Dict[SecurityLevel, ModerationAction] = {
     SecurityLevel.LOW: ModerationAction.REVIEW,
-    SecurityLevel.MEDIUM: ModerationAction.REVIEW,
+    SecurityLevel.MEDIUM: ModerationAction.PARTIAL_MASK,
     SecurityLevel.HIGH: ModerationAction.FULL_BLOCK,
 }
 
@@ -69,7 +70,11 @@ class PolicyManager:
         if scorer_result.get("is_ai_detected"):
             action = _AI_MATRIX[level]
 
-            processed_text = (""if action == ModerationAction.FULL_BLOCK else original_text)
+            processed_text = (
+                ""
+                if action == ModerationAction.FULL_BLOCK
+                else original_text
+            )
 
             return {
                 "action": action,

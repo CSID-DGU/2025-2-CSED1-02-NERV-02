@@ -8,10 +8,13 @@ from .policy_manager import PolicyManager
 from .context import VideoContext
 from app.services.active_learning_collector import ActiveLearningCollector
 from app.schemas import FilterResult, TextAnalysisResponse, ScorerFlags
-from app.schemas.enums import SecurityLevel
+from app.schemas.enums import SecurityLevel, ModerationAction
 
 logger = logging.getLogger(__name__)
 
+AI_ATTRIBUTION_THRESHOLD = 0.15
+AI_ATTRIBUTION_TOP_K = 10
+AI_ATTRIBUTION_FALLBACK_TOP_N = 1
 
 class TextAnalysisService:
     def __init__(
@@ -37,12 +40,46 @@ class TextAnalysisService:
         video_context: VideoContext,
     ) -> TextAnalysisResponse:
         scorer_result = self.scorer.execute(filter_result, video_context)
+
+        security_level = SecurityLevel(user.security_level)
+
         final_decision = self.policy.decide_action(
             scorer_result=scorer_result,
             filter_result=filter_result,
             security_level=SecurityLevel(user.security_level),
             ai_soften_enabled=user.ai_soften_enabled,
         )
+
+        # ──────────────────────────────────────────────
+        # AI 탐지 결과에 대한 보안 수준별 후처리
+        # LOW    → 원문 유지 + 프론트 경고
+        # MEDIUM → Input Gradient 기반 부분 마스킹
+        # HIGH   → 전체 차단
+        # ──────────────────────────────────────────────
+        ai_modules = scorer_result.get("ai_modules", [])
+
+        if ai_modules and final_decision["action"] == ModerationAction.PARTIAL_MASK:
+            try:
+                masking_result = self.second_pass.mask_by_ai_evidence(
+                    text=text,
+                    target_modules=ai_modules,
+                    attribution_threshold=AI_ATTRIBUTION_THRESHOLD,
+                    top_k=AI_ATTRIBUTION_TOP_K,
+                    fallback_top_n=AI_ATTRIBUTION_FALLBACK_TOP_N,
+                )
+
+                final_decision["processed_text"] = masking_result["processed_text"]
+
+            except Exception as e:
+                logger.error(
+                    "AI Input Gradient 마스킹 중 오류 발생: %s",
+                    e,
+                    exc_info=True,
+                )
+
+                # 마스킹 실패 시 전체 차단하지 않고 REVIEW로 폴백
+                final_decision["processed_text"] = text
+                final_decision["action"] = ModerationAction.REVIEW
 
         preview = text[:20].replace("\n", " ")
         logger.info(

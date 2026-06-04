@@ -56,6 +56,22 @@ class SecondPassFilter:
             enabled_modules=enabled_modules,
         )
 
+    def mask_by_ai_evidence(
+        self,
+        text: str,
+        target_modules: list[str] | set[str],
+        attribution_threshold: float = 0.15,
+        top_k: int = 10,
+        fallback_top_n: int = 1,
+    ) -> dict:
+        return self.ai_manager.mask_by_input_gradient(
+            text=text,
+            target_modules=target_modules,
+            attribution_threshold=attribution_threshold,
+            top_k=top_k,
+            fallback_top_n=fallback_top_n,
+        )
+
     async def update_ai_module(
         self,
         module_name: str,
