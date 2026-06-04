@@ -20,7 +20,7 @@ export interface YoutubeAnalysisResponse {
   results: RawComment[];
 }
 
-export type AiModuleKey = 'spam' | 'pii' | 'politics' | 'criticism' | 'basic' | 'sexual';
+export type AiModuleKey = 'spam' | 'pii' | 'politics' | 'criticism' | 'basic' | 'sexual' | 'family';
 
 export type AiModules = Record<AiModuleKey, boolean>;
 

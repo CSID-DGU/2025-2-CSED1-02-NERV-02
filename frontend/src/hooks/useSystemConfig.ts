@@ -9,6 +9,7 @@ const MODULE_KEYS = [
   'criticism',
   'basic',
   'sexual',
+  'family',
 ] as const;
 
 // [변환기] 백엔드 -> 프론트엔드
@@ -20,6 +21,7 @@ const transformToAppSettings = (data: SystemConfigResponse): AppSettings => {
     criticism: false,
     basic: false,
     sexual: false,
+    family: false,
   };
 
   const enabledModules = new Set(
@@ -64,7 +66,7 @@ const transformToBackendUpdate = (settings: AppSettings): SystemConfigUpdate => 
 const PLACEHOLDER_CONFIG: SystemConfigResponse = {
   user_id: 0,
   security_level: 'MEDIUM',
-  enabled_modules: 'spam,pii,politics,criticism,basic,sexual',
+  enabled_modules: 'spam,pii,politics,criticism,basic,sexual,family',
   ai_soften_enabled: false,
   use_detail_ai_model: false,
   youtube_channel_id: null,

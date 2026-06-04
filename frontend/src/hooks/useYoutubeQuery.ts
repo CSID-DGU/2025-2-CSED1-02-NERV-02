@@ -171,7 +171,7 @@ export const useFullAnalysis = (
           author: raw.author,
           published_at: raw.published_at,
           parent_id: raw.parent_id ?? null,
-          masked_text: textResults[i].details.masked_text,
+          masked_text: textResults[i].processed_text,
           score: textResults[i].score,
           detected_words: textResults[i].details.detected_words,
           flags: textResults[i].flags,
