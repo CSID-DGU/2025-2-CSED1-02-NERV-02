@@ -1,6 +1,7 @@
 import logging
 
 from app.services.filtering.ai_model import load_all_second_pass_models
+from app.services.filtering.logistic_gate import LogisticGateFilter
 
 logger = logging.getLogger(__name__)
 
@@ -9,6 +10,7 @@ class SecondPassFilter:
     def __init__(self):
         self.model_bundle = load_all_second_pass_models()
         self.ai_manager = self.model_bundle.manager
+        self.gate_filter = LogisticGateFilter()
 
     async def execute(
         self,
@@ -16,11 +18,24 @@ class SecondPassFilter:
         enabled_modules: str = "ALL",
     ) -> dict:
         original_text = first_pass_result["original_text"]
-
         enabled = self._parse_enabled_modules(enabled_modules)
 
         try:
-            ai_scores = await self._call_ai_model(original_text, enabled)
+            gate_selected_modules, gate_scores = self.gate_filter.select_modules(
+                text=original_text,
+                enabled_modules=enabled,
+            )
+            
+            if not gate_selected_modules:
+                return {
+                    **first_pass_result,
+                    "second_pass_scores": {},
+                }
+
+            ai_scores = await self._call_ai_model(
+                text=original_text,
+                enabled_modules=gate_selected_modules,
+            )
 
             return {
                 **first_pass_result,
