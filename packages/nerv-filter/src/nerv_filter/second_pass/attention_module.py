@@ -45,7 +45,7 @@ class AttentionModule:
         if not head_path.exists():
             raise FileNotFoundError(f"attention_head.pt 없음: {head_path}")
 
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             self.config = json.load(f)
 
         self.head = MLPAttentionHead(
