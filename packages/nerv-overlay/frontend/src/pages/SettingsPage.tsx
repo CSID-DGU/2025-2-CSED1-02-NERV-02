@@ -25,10 +25,27 @@ const DEFAULTS: FormState = {
   blacklist: [],
 }
 
+// 2차 AI 카테고리 모듈 (UI 전용 — 현재 백엔드 미연동)
+const AI_MODULES: { key: string; label: string }[] = [
+  { key: 'basic', label: '욕설' },
+  { key: 'sexual', label: '성적' },
+  { key: 'spam', label: '스팸' },
+  { key: 'politics', label: '정치' },
+  { key: 'pii', label: '개인정보' },
+  { key: 'criticism', label: '비판' },
+  { key: 'family', label: '가족' },
+]
+
 export function SettingsPage() {
   const qc = useQueryClient()
   const [form, setForm] = useState<FormState>(DEFAULTS)
   const [savedAt, setSavedAt] = useState<number | null>(null)
+  // 모듈별 ON/OFF — UI 전용 (기본 전체 ON). 백엔드 저장은 아직 연동 안 함.
+  const [enabledModules, setEnabledModules] = useState<string[]>(AI_MODULES.map((m) => m.key))
+  const toggleModule = (key: string) =>
+    setEnabledModules((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    )
 
   const { data: existing } = useQuery({
     queryKey: ['overlay-active'],
@@ -177,6 +194,51 @@ export function SettingsPage() {
                   : '2차 AI 모델을 건너뜁니다. 1차(사전+형태소) 필터만 동작합니다.'}
               </p>
             </div>
+
+            {form.use_ai_filter && (
+              <div className="ai-module-toggles" style={{ marginTop: 12 }}>
+                <p className="hint" style={{ margin: '0 0 8px', fontSize: 11 }}>
+                  검사할 카테고리를 선택하세요. 클릭하여 ON/OFF
+                  <span style={{ marginLeft: 6, opacity: 0.7 }}>
+                    ({enabledModules.length}/{AI_MODULES.length} 사용 중)
+                  </span>
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {AI_MODULES.map((m) => {
+                    const on = enabledModules.includes(m.key)
+                    return (
+                      <button
+                        key={m.key}
+                        type="button"
+                        onClick={() => toggleModule(m.key)}
+                        aria-pressed={on}
+                        title={on ? `${m.label} 켜짐 (클릭하여 끄기)` : `${m.label} 꺼짐 (클릭하여 켜기)`}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '6px 12px',
+                          fontSize: 12,
+                          lineHeight: 1,
+                          borderRadius: 999,
+                          cursor: 'pointer',
+                          transition: 'all .12s ease',
+                          border: on
+                            ? '1px solid var(--color-accent, #6c7bff)'
+                            : '1px solid var(--color-border, #3a3a44)',
+                          background: on ? 'var(--color-accent, #6c7bff)' : 'transparent',
+                          color: on ? '#fff' : 'var(--color-text-muted, #9a9aa6)',
+                          opacity: on ? 1 : 0.65,
+                        }}
+                      >
+                        <span aria-hidden style={{ fontSize: 9 }}>{on ? '●' : '○'}</span>
+                        {m.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
