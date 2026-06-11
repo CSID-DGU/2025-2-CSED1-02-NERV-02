@@ -22,6 +22,23 @@ from .scorer import RiskScorer
 
 logger = logging.getLogger(__name__)
 
+_AI_MASK_THRESHOLDS: dict[str, float] = {
+    "basic": 0.15,
+    "sexual": 0.20,
+    "criticism": 0.40,
+    "politics": 0.20,
+    "family": 1.50,
+}
+
+_AI_DETECTION_THRESHOLDS: dict[str, float] = {
+    "spam": 0.70,
+    "pii": 0.80,
+}
+
+_AI_FULL_BLOCK_MODULES = {"spam", "pii"}
+_AI_BLOCK_MESSAGE = "[안전 정책에 따라 차단된 메시지]"
+_LAUGHTER_CHARS = {"ㅋ", "ㅎ"}
+_SECOND_PASS_TRIGGER_MAX_KEYWORD_RATIO = 0.30
 
 class NervFilter:
     """한국어 텍스트 필터링 메인 클래스.
@@ -104,10 +121,11 @@ class NervFilter:
 
         - ``use_second_pass=False`` → 2차 건너뜀 (per-request on/off)
         - 2차 비활성/로드실패 → raw 그대로 (1차만)
-        - 1차에서 blacklist/trigger 확실 → 2차 스킵 (성능)
+        - 1차 검출 단어 길이 비율이 0.30 이상이면 1차 결과만 사용.
+        - 1차 검출 단어 길이 비율이 0.30 미만이면 2차 실행 후 2차 마스킹만 사용.
+        - 원문 텍스트로 2차 실행.
+        - 2차가 정상으로 판단하면 1차 결과도 정상으로 되돌림.
         - AI 점수: raw['second_pass_scores'] = {module: score} 형태로 저장.
-          threshold 통과 모듈이 있고 사전 검출이 없다면 detected_words 에 AI_BASIC 추가 +
-          위치 불명이라 문장 전체 마스킹.
         - 어떤 단계든 예외는 detector 내부에서 흡수 → 항상 1차 결과 보존.
         """
         if not use_second_pass:
@@ -115,27 +133,251 @@ class NervFilter:
         if self._second_pass is None or not self._second_pass.is_active:
             return raw
 
-        pre = self._scorer.execute(raw)
-        if pre.get("has_blacklist") or pre.get("has_trigger"):
-            return raw  # 1차에서 이미 확실 → 2차 불필요
+        keyword_ratio = self._first_pass_keyword_ratio(text, raw)
+        if keyword_ratio >= _SECOND_PASS_TRIGGER_MAX_KEYWORD_RATIO:
+            return raw
 
-        scores = self._second_pass.predict(text)
+        second_text = text
+        if not second_text.strip():
+            return raw
+
+        details = {}
+        if hasattr(self._second_pass, "predict_with_details"):
+            details = self._second_pass.predict_with_details(second_text)
+        scores = {
+            name: float(info.get("score", 0.0))
+            for name, info in details.items()
+        } if details else self._second_pass.predict(second_text)
         if not scores:
             return raw
 
         threshold = getattr(self._second_pass.config, "threshold", 0.8)
-        hits = [name for name, s in scores.items() if s >= threshold]
+        hits = [
+            name
+            for name, score in scores.items()
+            if score >= _AI_DETECTION_THRESHOLDS.get(name, threshold)
+        ]
+        if (
+            "basic" in hits
+            and {"criticism", "sexual"}.intersection(hits)
+            and not _AI_FULL_BLOCK_MODULES.intersection(hits)
+        ):
+            # basic 과 criticism/sexual 이 같이 잡히면 criticism/sexual 만 제거하고,
+            # basic 및 다른 모듈은 유지한다.
+            hits = [name for name in hits if name not in {"criticism", "sexual"}]
+            scores = {
+                name: score
+                for name, score in scores.items()
+                if name not in {"criticism", "sexual"}
+            }
+            if details:
+                details = {
+                    name: info
+                    for name, info in details.items()
+                    if name not in {"criticism", "sexual"}
+                }
+
+        if "criticism" in hits and "sexual" in hits:
+            winner = (
+                "criticism"
+                if scores.get("criticism", 0.0) >= scores.get("sexual", 0.0)
+                else "sexual"
+            )
+            loser = "sexual" if winner == "criticism" else "criticism"
+            hits = [name for name in hits if name != loser]
+            scores = {name: score for name, score in scores.items() if name != loser}
+            if details:
+                details = {name: info for name, info in details.items() if name != loser}
+
+        if "criticism" in hits and len(hits) > 1:
+            # criticism 은 단독 검출일 때만 적용. 다른 모듈과 동시 검출되면 노이즈로 본다.
+            hits = [name for name in hits if name != "criticism"]
+            scores = {name: score for name, score in scores.items() if name != "criticism"}
+            if details:
+                details = {name: info for name, info in details.items() if name != "criticism"}
+
+        if "sexual" in hits and len(hits) > 1:
+            # sexual 은 criticism 과의 단독 경합을 제외하면, 다른 모듈과 동시 검출 시 제거한다.
+            hits = [name for name in hits if name != "sexual"]
+            scores = {name: score for name, score in scores.items() if name != "sexual"}
+            if details:
+                details = {name: info for name, info in details.items() if name != "sexual"}
+
+        if "politics" in hits and "family" in hits:
+            winner = (
+                "politics"
+                if scores.get("politics", 0.0) >= scores.get("family", 0.0)
+                else "family"
+            )
+            loser = "family" if winner == "politics" else "politics"
+            hits = [name for name in hits if name != loser]
+            scores = {name: score for name, score in scores.items() if name != loser}
+            if details:
+                details = {name: info for name, info in details.items() if name != loser}
 
         raw = dict(raw)
         raw["second_pass_scores"] = scores
-        if hits and not raw.get("detected_words"):
-            # AI 만 트리거되고 1차 검출 없는 경우 — 카테고리를 detected_words 에 기록 + 전체 마스킹
-            raw["detected_words"] = [
-                {"word": cat, "type": WordType.AI_BASIC} for cat in hits
-            ]
+        if details:
+            raw["second_pass_details"] = details
+        if not hits:
+            return self._reset_to_clean(raw, text)
+
+        if hits:
+            detected = []
+            detected_keys = set()
+            for cat in hits:
+                key = (cat, WordType.AI_BASIC)
+                if key not in detected_keys:
+                    detected.append({"word": cat, "type": WordType.AI_BASIC})
+                    detected_keys.add(key)
+            raw["detected_words"] = detected
             raw["status"] = FilterStatus.FILTERED_BY_SECOND_PASS
-            raw["masked_text"] = "".join("*" if not c.isspace() else c for c in text)
+            raw["ai_modules"] = hits
+            if any(cat in _AI_FULL_BLOCK_MODULES for cat in hits):
+                raw["masked_text"] = _AI_BLOCK_MESSAGE
+                raw["action_override"] = ModerationAction.FULL_BLOCK
+            else:
+                raw["masked_text"] = self._render_second_pass_mask(second_text, hits, details)
         return raw
+
+    @staticmethod
+    def _first_pass_keyword_ratio(text: str, raw: dict) -> float:
+        """1차 마스킹 길이 / 원문 공백 제외 길이."""
+        non_space_len = sum(1 for ch in text if not ch.isspace())
+        if non_space_len <= 0:
+            return 0.0
+        masked_text = raw.get("masked_text") or ""
+        masked_len = sum(1 for ch in masked_text if ch == "*")
+        return masked_len / non_space_len
+
+    @staticmethod
+    def _reset_to_clean(raw: dict, text: str) -> dict:
+        """2차가 정상으로 본 문장은 1차 검출도 정상 결과로 되돌린다."""
+        clean = dict(raw)
+        clean["status"] = FilterStatus.PASSED
+        clean["detected_words"] = []
+        clean["masked_text"] = text
+        clean.pop("ai_modules", None)
+        clean.pop("action_override", None)
+        return clean
+
+    @staticmethod
+    def _is_laughter_span(text: str) -> bool:
+        compact = "".join(ch for ch in text if not ch.isspace())
+        return bool(compact) and all(ch in _LAUGHTER_CHARS for ch in compact)
+
+    @classmethod
+    def _render_second_pass_mask(cls, text: str, hits: list[str], details: dict) -> str:
+        """attention * max(logit, 0) evidence 로 2차 부분 마스킹."""
+        if not details:
+            return "".join("*" if not c.isspace() else c for c in text)
+
+        spans: list[tuple[int, int]] = []
+        for module_name in hits:
+            mask_threshold = _AI_MASK_THRESHOLDS.get(module_name)
+            if mask_threshold is None:
+                continue
+            module_details = details.get(module_name) or {}
+            spans.extend(
+                cls._evidence_spans(
+                    text,
+                    module_details.get("token_evidence") or [],
+                    mask_threshold,
+                )
+            )
+
+        if not spans:
+            return text
+
+        chars = list(text)
+        for start, end in spans:
+            for idx in range(start, end):
+                if 0 <= idx < len(chars) and not chars[idx].isspace():
+                    chars[idx] = "*"
+        return "".join(chars)
+
+    @classmethod
+    def _merge_second_pass_mask(
+        cls,
+        first_masked_text: str,
+        second_text: str,
+        hits: list[str],
+        details: dict,
+    ) -> str:
+        """2차 evidence span 을 1차 마스킹 결과와 병합.
+
+        2차 토큰 span 안에 1차 마스킹(``*``)이 이미 포함되어 있으면,
+        그 토큰은 1차 필터 결과만 유지하고 2차 마스킹을 추가하지 않는다.
+        """
+        if not details:
+            return first_masked_text
+
+        chars = list(first_masked_text)
+        for module_name in hits:
+            mask_threshold = _AI_MASK_THRESHOLDS.get(module_name)
+            if mask_threshold is None:
+                continue
+            module_details = details.get(module_name) or {}
+            spans = cls._evidence_spans(
+                second_text,
+                module_details.get("token_evidence") or [],
+                mask_threshold,
+                first_masked_text=first_masked_text,
+            )
+            for start, end in spans:
+                for idx in range(start, end):
+                    if 0 <= idx < len(chars) and not chars[idx].isspace():
+                        chars[idx] = "*"
+        return "".join(chars)
+
+    @classmethod
+    def _evidence_spans(
+        cls,
+        text: str,
+        token_evidence: list[dict],
+        threshold: float,
+        first_masked_text: str | None = None,
+    ) -> list[tuple[int, int]]:
+        """WordPiece evidence 병합 후 threshold 이상 span 반환.
+
+        병합 점수는 max(max_subtoken, sum / n^0.25).
+        """
+        groups: list[list[dict]] = []
+        current: list[dict] = []
+        previous_end: int | None = None
+
+        for item in sorted(token_evidence, key=lambda x: (int(x["start"]), int(x["end"]))):
+            start = int(item["start"])
+            end = int(item["end"])
+            if start >= end:
+                continue
+            token = str(item.get("token", ""))
+            is_continuation = token.startswith("##")
+            if current and (is_continuation or start <= (previous_end or start)):
+                current.append(item)
+            else:
+                if current:
+                    groups.append(current)
+                current = [item]
+            previous_end = max(previous_end or end, end)
+
+        if current:
+            groups.append(current)
+
+        spans: list[tuple[int, int]] = []
+        for group in groups:
+            start = min(int(item["start"]) for item in group)
+            end = max(int(item["end"]) for item in group)
+            if cls._is_laughter_span(text[start:end]):
+                continue
+            if first_masked_text is not None and "*" in first_masked_text[start:end]:
+                continue
+            evidences = [float(item.get("evidence", 0.0)) for item in group]
+            n = max(len(evidences), 1)
+            merged = max(max(evidences), sum(evidences) / (n ** 0.25))
+            if merged >= threshold:
+                spans.append((start, end))
+        return spans
 
     def _to_filter_result(self, text: str, raw: dict) -> FilterResult:
         scorer_result = self._scorer.execute(raw)

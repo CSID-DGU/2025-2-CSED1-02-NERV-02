@@ -57,7 +57,7 @@ public class OverlayConfig {
 
     @Column(name = "placeholder_text", nullable = false, length = 50)
     @Builder.Default
-    private String placeholderText = "[필터됨]";
+    private String placeholderText = "[안전 정책에 따라 차단된 메시지]";
 
     @Column(name = "show_score", nullable = false)
     @Builder.Default

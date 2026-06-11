@@ -56,7 +56,7 @@ public class OverlayConfigService {
                 .source(req.source() != null ? req.source() : "DUMMY")
                 .securityLevel(req.securityLevel() != null ? req.securityLevel() : "MEDIUM")
                 .blockDisplayMode(req.blockDisplayMode() != null ? req.blockDisplayMode() : "MASK")
-                .placeholderText(req.placeholderText() != null ? req.placeholderText() : "[필터됨]")
+                .placeholderText(req.placeholderText() != null ? req.placeholderText() : "[안전 정책에 따라 차단된 메시지]")
                 .showScore(req.showScore() != null ? req.showScore() : false)
                 .useAiFilter(req.useAiFilter() != null ? req.useAiFilter() : true)
                 .build();
@@ -110,7 +110,7 @@ public class OverlayConfigService {
                         "DUMMY",        // source
                         "MEDIUM",       // security_level
                         "MASK",         // block_display_mode
-                        "[필터됨]",      // placeholder_text
+                        "[안전 정책에 따라 차단된 메시지]",      // placeholder_text
                         false,          // show_score
                         true,           // use_ai_filter
                         List.of(),      // whitelist

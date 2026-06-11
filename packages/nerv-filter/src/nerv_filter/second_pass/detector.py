@@ -90,6 +90,19 @@ class SecondPassDetector:
             logger.warning("[2차필터] 추론 실패 — 결과 없음 처리: %s", e)
             return {}
 
+    def predict_with_details(self, text: str, enabled_modules: set[str] | None = None) -> dict[str, dict]:
+        """텍스트 → 모듈별 score/logit/token evidence 상세.
+
+        실패 시 빈 dict. 예외를 던지지 않음.
+        """
+        if not self._active or not text or self._manager is None:
+            return {}
+        try:
+            return self._manager.predict_one_with_details(text, enabled_modules=enabled_modules)
+        except Exception as e:
+            logger.warning("[2차필터] 상세 추론 실패 — 결과 없음 처리: %s", e)
+            return {}
+
     def detect(self, text: str, enabled_modules: set[str] | None = None) -> list[str]:
         """이전 API 호환 — threshold 이상인 카테고리 이름 리스트만 반환."""
         scores = self.predict(text, enabled_modules=enabled_modules)

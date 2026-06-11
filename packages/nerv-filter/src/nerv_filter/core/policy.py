@@ -53,7 +53,20 @@ class PolicyManager:
         detected_words = filter_result.get("detected_words", [])
         # first_pass 가 위치 기반으로 정확히 마스킹한 결과
         precomputed_masked = filter_result.get("masked_text", original_text)
+        action_override = filter_result.get("action_override")
         score = scorer_result.get("score", 0.0)
+
+        if action_override:
+            action = (
+                action_override
+                if isinstance(action_override, ModerationAction)
+                else ModerationAction(action_override)
+            )
+            return {
+                "action": action,
+                "processed_text": precomputed_masked,
+                "score": score,
+            }
 
         if not detected_words:
             return {

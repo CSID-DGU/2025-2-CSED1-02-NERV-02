@@ -84,6 +84,60 @@ class AttentionAIManager:
             scores[module_name] = float(score)
         return scores
 
+    def predict_one_with_details(
+        self,
+        text: str,
+        enabled_modules: set[str] | None = None,
+    ) -> dict[str, dict]:
+        """텍스트 → 모듈별 score/logit/token evidence 상세."""
+        if enabled_modules is None:
+            target_modules = set(self.modules.keys())
+        else:
+            target_modules = {
+                module_name.strip().lower()
+                for module_name in enabled_modules
+                if module_name and module_name.strip()
+            }
+
+        if not target_modules:
+            return {}
+
+        encoded = self.encoder.encode_one(text)
+        token_hidden = encoded["token_hidden"]
+        attention_mask = encoded["attention_mask"]
+        tokens = encoded.get("tokens") or [[]]
+        offsets = encoded.get("offset_mapping") or [[]]
+
+        details: dict[str, dict] = {}
+        for module_name in target_modules:
+            module = self.modules.get(module_name)
+            if module is None:
+                continue
+            raw = module.predict_with_attention(
+                token_hidden=token_hidden,
+                attention_mask=attention_mask,
+            )
+            positive_logit = max(float(raw["logit"]), 0.0)
+            token_evidence = []
+            for token, offset, attention in zip(tokens[0], offsets[0], raw["attention"], strict=False):
+                if not offset or len(offset) != 2:
+                    continue
+                start, end = int(offset[0]), int(offset[1])
+                if start == end:
+                    continue
+                token_evidence.append({
+                    "token": token,
+                    "start": start,
+                    "end": end,
+                    "evidence": float(attention) * positive_logit,
+                })
+            details[module_name] = {
+                "score": float(raw["score"]),
+                "logit": float(raw["logit"]),
+                "token_evidence": token_evidence,
+            }
+        return details
+
     def update_one(
         self,
         module_name: str,

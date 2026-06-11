@@ -81,6 +81,25 @@ class AttentionModule:
             score = torch.sigmoid(logits)[0].item()
             return float(score)
 
+    def predict_with_attention(self, token_hidden, attention_mask) -> dict:
+        """점수와 token attention evidence 계산용 원천값을 함께 반환."""
+        torch = self._torch
+        with self.lock, torch.no_grad():
+            self.head.eval()
+            logits, attn_weights = self.head(
+                token_hidden=token_hidden,
+                attention_mask=attention_mask,
+                return_attention=True,
+            )
+            logit = float(logits[0].item())
+            score = float(torch.sigmoid(logits)[0].item())
+            attention = attn_weights[0].detach().cpu().tolist()
+            return {
+                "score": score,
+                "logit": logit,
+                "attention": attention,
+            }
+
     def update_from_hidden(
         self,
         token_hidden,

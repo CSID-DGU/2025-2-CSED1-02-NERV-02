@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS overlay_configs (
     -- 필터 설정
     security_level      VARCHAR(10)     NOT NULL DEFAULT 'MEDIUM',
     block_display_mode  VARCHAR(20)     NOT NULL DEFAULT 'MASK',  -- MASK / HIDE / PLACEHOLDER
-    placeholder_text    VARCHAR(50)     NOT NULL DEFAULT '[필터됨]',
+    placeholder_text    VARCHAR(50)     NOT NULL DEFAULT '[안전 정책에 따라 차단된 메시지]',
     show_score          BOOLEAN         NOT NULL DEFAULT FALSE,
 
     -- 시각 설정 (Phase 후반에서 확장)

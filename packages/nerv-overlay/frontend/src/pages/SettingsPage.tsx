@@ -18,7 +18,7 @@ type FormState = {
 const DEFAULTS: FormState = {
   security_level: 'MEDIUM',
   block_display_mode: 'MASK',
-  placeholder_text: '[필터됨]',
+  placeholder_text: '[안전 정책에 따라 차단된 메시지]',
   show_score: false,
   use_ai_filter: true,
   whitelist: [],

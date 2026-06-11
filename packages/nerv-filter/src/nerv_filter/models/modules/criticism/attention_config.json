@@ -10,7 +10,7 @@
     "normal",
     "positive"
   ],
-  "best_f1": 0.9200193892389724,
+  "best_f1": 0.9178386380458919,
   "best_epoch": 3,
   "batch_size": 8,
   "epochs": 3,

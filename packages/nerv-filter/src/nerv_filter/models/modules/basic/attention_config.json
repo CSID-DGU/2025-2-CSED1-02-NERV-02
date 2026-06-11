@@ -10,8 +10,8 @@
     "normal",
     "positive"
   ],
-  "best_f1": 0.7902134305049453,
-  "best_epoch": 2,
+  "best_f1": 0.7611853573503777,
+  "best_epoch": 3,
   "batch_size": 8,
   "epochs": 3,
   "learning_rate": 0.0001,

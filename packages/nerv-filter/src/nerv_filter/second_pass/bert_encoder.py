@@ -57,13 +57,22 @@ class KcBertEncoder:
     def encode_texts(self, texts: list[str]) -> dict:
         torch = self._torch
 
-        encoding = self.tokenizer(
-            texts,
-            truncation=True,
-            padding="max_length",
-            max_length=self.max_length,
-            return_tensors="pt",
-        )
+        encoding_kwargs = {
+            "truncation": True,
+            "padding": "max_length",
+            "max_length": self.max_length,
+            "return_tensors": "pt",
+        }
+        try:
+            encoding = self.tokenizer(
+                texts,
+                return_offsets_mapping=True,
+                **encoding_kwargs,
+            )
+            offset_mapping = encoding.pop("offset_mapping")
+        except NotImplementedError:
+            encoding = self.tokenizer(texts, **encoding_kwargs)
+            offset_mapping = None
 
         input_ids = encoding["input_ids"].to(self.device)
         attention_mask = encoding["attention_mask"].to(self.device)
@@ -84,6 +93,13 @@ class KcBertEncoder:
             "attention_mask": attention_mask,
             "token_type_ids": token_type_ids,
             "token_hidden": outputs.last_hidden_state,
+            "tokens": [
+                self.tokenizer.convert_ids_to_tokens(ids)
+                for ids in encoding["input_ids"].detach().cpu().tolist()
+            ],
+            "offset_mapping": offset_mapping.detach().cpu().tolist()
+            if offset_mapping is not None
+            else None,
         }
 
     def encode_one(self, text: str) -> dict:
